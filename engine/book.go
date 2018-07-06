@@ -44,6 +44,10 @@ func NewBook(transact TransactCallback, cancel CancelCallback) *Book {
 	}
 }
 
+func (book *Book) Orderbooks(count int) ([]*Entry, []*Entry) {
+	return book.asks.List(count), book.bids.List(count)
+}
+
 func (book *Book) AttachOrderEvent(ctx context.Context, order *Order, action string) {
 	if order.Side != PageSideAsk && order.Side != PageSideBid {
 		log.Panicln(order, action)

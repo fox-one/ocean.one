@@ -43,6 +43,15 @@ func NewExchange(persist persistence.Persist, mixinClient *mixin.Client) *Exchan
 	}
 }
 
+func (ex *Exchange) Orderbooks(baseAssetId, quoteAssetId string, count int) ([]*engine.Entry, []*engine.Entry) {
+	market := baseAssetId + "-" + quoteAssetId
+	if book, found := ex.books[market]; found {
+		return book.Orderbooks(count)
+	}
+
+	return []*engine.Entry{}, []*engine.Entry{}
+}
+
 func (ex *Exchange) Run(ctx context.Context) {
 	go ex.PollMixinMessages(ctx)
 	go ex.PollMixinNetwork(ctx)
