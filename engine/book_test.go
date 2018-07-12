@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/MixinMessenger/go-number"
-	"github.com/MixinMessenger/ocean.one/cache"
-	"github.com/MixinMessenger/ocean.one/config"
+	"github.com/fox-one/ocean.one/cache"
+	"github.com/fox-one/ocean.one/config"
 	"github.com/go-redis/redis"
 	"github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"

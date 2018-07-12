@@ -27,8 +27,8 @@ type Transfer struct {
 	UserId     string    `spanner:"user_id"`
 }
 
-func ListPendingTransfers(ctx context.Context, limit int) ([]*Transfer, error) {
-	txn := Spanner(ctx).ReadOnlyTransaction()
+func (p *Spanner) ListPendingTransfers(ctx context.Context, limit int) ([]*Transfer, error) {
+	txn := p.spanner.ReadOnlyTransaction()
 	defer txn.Close()
 
 	it := txn.Query(ctx, spanner.Statement{
@@ -75,19 +75,19 @@ func ListPendingTransfers(ctx context.Context, limit int) ([]*Transfer, error) {
 	}
 }
 
-func ExpireTransfers(ctx context.Context, transfers []*Transfer) error {
+func (p *Spanner) ExpireTransfers(ctx context.Context, transfers []*Transfer) error {
 	var set []spanner.KeySet
 	for _, t := range transfers {
 		set = append(set, spanner.Key{t.TransferId})
 	}
-	_, err := Spanner(ctx).Apply(ctx, []*spanner.Mutation{
+	_, err := p.spanner.Apply(ctx, []*spanner.Mutation{
 		spanner.Delete("transfers", spanner.KeySets(set...)),
 	})
 	return err
 }
 
-func ReadTransferTrade(ctx context.Context, tradeId, assetId string) (*Trade, error) {
-	it := Spanner(ctx).Single().Query(ctx, spanner.Statement{
+func (p *Spanner) ReadTransferTrade(ctx context.Context, tradeId, assetId string) (*Trade, error) {
+	it := p.spanner.Single().Query(ctx, spanner.Statement{
 		SQL:    "SELECT * FROM trades WHERE trade_id=@trade_id",
 		Params: map[string]interface{}{"trade_id": tradeId},
 	})
@@ -111,7 +111,7 @@ func ReadTransferTrade(ctx context.Context, tradeId, assetId string) (*Trade, er
 	}
 }
 
-func CreateRefundTransfer(ctx context.Context, userId, assetId string, amount number.Decimal, trace string) error {
+func (p *Spanner) CreateRefundTransfer(ctx context.Context, userId, assetId string, amount number.Decimal, trace string) error {
 	if amount.Exhausted() {
 		return nil
 	}
@@ -128,6 +128,6 @@ func CreateRefundTransfer(ctx context.Context, userId, assetId string, amount nu
 	if err != nil {
 		return err
 	}
-	_, err = Spanner(ctx).Apply(ctx, []*spanner.Mutation{mutation})
+	_, err = p.spanner.Apply(ctx, []*spanner.Mutation{mutation})
 	return err
 }

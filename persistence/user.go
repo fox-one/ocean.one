@@ -19,12 +19,12 @@ type User struct {
 	PublicKey string
 }
 
-func UpdateUserPublicKey(ctx context.Context, userId, publicKey string) error {
+func (p *Spanner) UpdateUserPublicKey(ctx context.Context, userId, publicKey string) error {
 	if _, err := hex.DecodeString(publicKey); err != nil {
 		return nil
 	}
 
-	_, err := Spanner(ctx).ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+	_, err := p.spanner.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		it := txn.ReadUsingIndex(ctx, "users", "users_by_public_key", spanner.Key{publicKey}, []string{"user_id"})
 		defer it.Stop()
 
@@ -46,7 +46,7 @@ func UpdateUserPublicKey(ctx context.Context, userId, publicKey string) error {
 	return err
 }
 
-func Authenticate(ctx context.Context, jwtToken string) (string, error) {
+func (p *Spanner) Authenticate(ctx context.Context, jwtToken string) (string, error) {
 	var userId string
 	token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
 		claims, ok := token.Claims.(jwt.MapClaims)
@@ -64,7 +64,7 @@ func Authenticate(ctx context.Context, jwtToken string) (string, error) {
 			userId = id.String()
 		}
 
-		it := Spanner(ctx).Single().Read(ctx, "users", spanner.Key{userId}, []string{"public_key"})
+		it := p.spanner.Single().Read(ctx, "users", spanner.Key{userId}, []string{"public_key"})
 		defer it.Stop()
 		row, err := it.Next()
 		if err == iterator.Done {
@@ -90,8 +90,8 @@ func Authenticate(ctx context.Context, jwtToken string) (string, error) {
 	return "", nil
 }
 
-func UserOrders(ctx context.Context, userId string, market, state string, offset time.Time, limit int) ([]*Order, error) {
-	txn := Spanner(ctx).ReadOnlyTransaction()
+func (p *Spanner) UserOrders(ctx context.Context, userId string, market, state string, offset time.Time, limit int) ([]*Order, error) {
+	txn := p.spanner.ReadOnlyTransaction()
 	defer txn.Close()
 
 	if limit > 100 {

@@ -1,29 +1,17 @@
-package main
+package exchange
 
 import (
-	"bytes"
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
-	"crypto/x509"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"time"
 
-	"github.com/MixinMessenger/bot-api-go-client"
 	"github.com/MixinMessenger/go-number"
-	"github.com/MixinMessenger/ocean.one/config"
-	"github.com/MixinMessenger/ocean.one/engine"
-	"github.com/MixinMessenger/ocean.one/persistence"
+	"github.com/fox-one/ocean.one/config"
+	"github.com/fox-one/ocean.one/engine"
 	"github.com/satori/go.uuid"
 	"github.com/ugorji/go/codec"
 )
@@ -95,10 +83,10 @@ func (ex *Exchange) processSnapshot(ctx context.Context, s *Snapshot) error {
 		return ex.refundSnapshot(ctx, s)
 	}
 	if len(action.U) > 16 {
-		return persistence.UpdateUserPublicKey(ctx, s.OpponentId, action.U)
+		return ex.persist.UpdateUserPublicKey(ctx, s.OpponentId, action.U)
 	}
 	if action.O.String() != uuid.Nil.String() {
-		return persistence.CancelOrderAction(ctx, action.O.String(), s.CreatedAt, s.OpponentId)
+		return ex.persist.CancelOrderAction(ctx, action.O.String(), s.CreatedAt, s.OpponentId)
 	}
 
 	if action.A.String() == s.Asset.AssetId {
@@ -152,7 +140,7 @@ func (ex *Exchange) processSnapshot(ctx context.Context, s *Snapshot) error {
 		}
 	}
 
-	return persistence.CreateOrderAction(ctx, &engine.Order{
+	return ex.persist.CreateOrderAction(ctx, &engine.Order{
 		Id:              s.TraceId,
 		Type:            action.T,
 		Side:            action.S,
@@ -198,7 +186,7 @@ func (ex *Exchange) refundSnapshot(ctx context.Context, s *Snapshot) error {
 	if amount.Exhausted() {
 		return nil
 	}
-	return persistence.CreateRefundTransfer(ctx, s.OpponentId, s.Asset.AssetId, amount, s.TraceId)
+	return ex.persist.CreateRefundTransfer(ctx, s.OpponentId, s.Asset.AssetId, amount, s.TraceId)
 }
 
 func (ex *Exchange) decryptOrderAction(ctx context.Context, data string) *OrderAction {
@@ -229,11 +217,7 @@ func (ex *Exchange) decryptOrderAction(ctx context.Context, data string) *OrderA
 
 func (ex *Exchange) requestMixinNetwork(ctx context.Context, checkpoint time.Time, limit int) ([]*Snapshot, error) {
 	uri := fmt.Sprintf("/network/snapshots?offset=%s&order=ASC&limit=%d", checkpoint.Format(time.RFC3339Nano), limit)
-	token, err := bot.SignAuthenticationToken(config.ClientId, config.SessionId, config.SessionKey, "GET", uri, "")
-	if err != nil {
-		return nil, err
-	}
-	body, err := bot.Request(ctx, "GET", uri, nil, token)
+	body, err := ex.mixinClient.SendRequest(ctx, "GET", uri, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +240,7 @@ func (ex *Exchange) sendTransfer(ctx context.Context, recipientId, assetId strin
 		return nil
 	}
 
-	pin := encryptPIN(ctx, config.SessionAssetPIN, config.PinToken, config.SessionId, config.SessionKey, uint64(time.Now().UnixNano()))
+	pin := ex.mixinClient.EncryptPin()
 	data, err := json.Marshal(map[string]interface{}{
 		"asset_id":    assetId,
 		"opponent_id": recipientId,
@@ -269,11 +253,7 @@ func (ex *Exchange) sendTransfer(ctx context.Context, recipientId, assetId strin
 		return err
 	}
 
-	token, err := bot.SignAuthenticationToken(config.ClientId, config.SessionId, config.SessionKey, "POST", "/transfers", string(data))
-	if err != nil {
-		return err
-	}
-	body, err := bot.Request(ctx, "POST", "/transfers", data, token)
+	body, err := ex.mixinClient.SendRequest(ctx, "POST", "/transfers", data)
 	if err != nil {
 		return err
 	}
@@ -289,37 +269,4 @@ func (ex *Exchange) sendTransfer(ctx context.Context, recipientId, assetId strin
 		return errors.New(resp.Error.Description)
 	}
 	return nil
-}
-
-func encryptPIN(ctx context.Context, pin, pinToken, sessionId, privateKey string, iterator uint64) string {
-	privBlock, _ := pem.Decode([]byte(privateKey))
-	if privBlock == nil {
-		return ""
-	}
-	priv, err := x509.ParsePKCS1PrivateKey(privBlock.Bytes)
-	if err != nil {
-		return ""
-	}
-	token, _ := base64.StdEncoding.DecodeString(pinToken)
-	keyBytes, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, priv, token, []byte(sessionId))
-	if err != nil {
-		return ""
-	}
-	pinByte := []byte(pin)
-	timeBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(timeBytes, uint64(time.Now().Unix()))
-	pinByte = append(pinByte, timeBytes...)
-	iteratorBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(iteratorBytes, iterator)
-	pinByte = append(pinByte, iteratorBytes...)
-	padding := aes.BlockSize - len(pinByte)%aes.BlockSize
-	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
-	pinByte = append(pinByte, padtext...)
-	block, _ := aes.NewCipher(keyBytes)
-	ciphertext := make([]byte, aes.BlockSize+len(pinByte))
-	iv := ciphertext[:aes.BlockSize]
-	io.ReadFull(rand.Reader, iv)
-	mode := cipher.NewCBCEncrypter(block, iv)
-	mode.CryptBlocks(ciphertext[aes.BlockSize:], pinByte)
-	return base64.StdEncoding.EncodeToString(ciphertext)
 }
