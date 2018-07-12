@@ -7,11 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/MixinNetwork/ocean.one/cache"
-	"github.com/MixinNetwork/ocean.one/config"
-	"github.com/MixinNetwork/ocean.one/persistence"
 	"github.com/bugsnag/bugsnag-go"
 	"github.com/dimfeld/httptreemux"
+	"github.com/fox-one/ocean.one/cache"
+	"github.com/fox-one/ocean.one/config"
+	"github.com/fox-one/ocean.one/exchange"
+	"github.com/fox-one/ocean.one/persistence"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/websocket"
 	"github.com/satori/go.uuid"
@@ -22,6 +23,8 @@ type RequestHandler struct {
 	hub      *cache.Hub
 	upgrader *websocket.Upgrader
 	router   *httptreemux.TreeMux
+
+	persist persistence.Persist
 }
 
 func (handler *RequestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -38,17 +41,17 @@ func (handler *RequestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 
 	if strings.ToLower(r.Header.Get("Upgrade")) != "websocket" {
-		cp, err := persistence.ReadPropertyAsTime(r.Context(), CheckpointMixinNetworkSnapshots)
+		cp, err := handler.persist.ReadPropertyAsTime(r.Context(), exchange.CheckpointMixinNetworkSnapshots)
 		if err != nil {
 			render.New().JSON(w, http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 			return
 		}
-		ac, err := persistence.CountPendingActions(r.Context())
+		ac, err := handler.persist.CountPendingActions(r.Context())
 		if err != nil {
 			render.New().JSON(w, http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 			return
 		}
-		tc, err := persistence.CountPendingTransfers(r.Context())
+		tc, err := handler.persist.CountPendingTransfers(r.Context())
 		if err != nil {
 			render.New().JSON(w, http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 			return
@@ -87,7 +90,7 @@ func (handler *RequestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	client.ReadPump(ctx)
 }
 
-func StartHTTP(ctx context.Context) error {
+func StartHTTP(ctx context.Context, persist persistence.Persist) error {
 	hub := cache.NewHub()
 	go hub.Run(ctx)
 
@@ -102,7 +105,7 @@ func StartHTTP(ctx context.Context) error {
 				render.New().JSON(w, status, map[string]interface{}{"error": reason.Error()})
 			},
 		},
-		router: NewRouter(),
+		router: NewRouter(persist),
 	}
 	handler := handleContext(rh, ctx)
 	handler = handleCORS(handler)
@@ -116,7 +119,6 @@ func StartHTTP(ctx context.Context) error {
 func handleContext(handler http.Handler, src context.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := cache.SetupRedis(r.Context(), cache.Redis(src))
-		ctx = persistence.SetupSpanner(ctx, persistence.Spanner(src))
 		handler.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

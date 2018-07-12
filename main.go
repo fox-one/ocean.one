@@ -2,14 +2,18 @@ package main
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"flag"
 	"log"
 	"time"
 
 	"cloud.google.com/go/spanner"
-	"github.com/MixinNetwork/ocean.one/cache"
-	"github.com/MixinNetwork/ocean.one/config"
-	"github.com/MixinNetwork/ocean.one/persistence"
+	"github.com/fox-one/ocean.one/cache"
+	"github.com/fox-one/ocean.one/config"
+	"github.com/fox-one/ocean.one/exchange"
+	"github.com/fox-one/ocean.one/mixin"
+	"github.com/fox-one/ocean.one/persistence"
 	"github.com/go-redis/redis"
 )
 
@@ -27,6 +31,16 @@ func main() {
 		log.Panicln(err)
 	}
 
+	persist := persistence.CreateSpanner(spannerClient)
+
+	block, _ := pem.Decode([]byte(config.SessionKey))
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	mixinClient := mixin.CreateMixinClient(config.ClientId, config.SessionId, config.PinToken, config.SessionAssetPIN, privateKey)
+
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:         config.RedisEngineCacheAddress,
 		DB:           config.RedisEngineCacheDatabase,
@@ -41,13 +55,12 @@ func main() {
 		log.Panicln(err)
 	}
 
-	ctx = persistence.SetupSpanner(ctx, spannerClient)
 	ctx = cache.SetupRedis(ctx, redisClient)
 
 	switch *service {
 	case "engine":
-		NewExchange().Run(ctx)
+		exchange.NewExchange(persist, mixinClient).Run(ctx)
 	case "http":
-		StartHTTP(ctx)
+		StartHTTP(ctx, persist)
 	}
 }

@@ -1,4 +1,4 @@
-package main
+package exchange
 
 import (
 	"context"
@@ -8,9 +8,10 @@ import (
 
 	"github.com/MixinNetwork/bot-api-go-client"
 	"github.com/MixinNetwork/go-number"
-	"github.com/MixinNetwork/ocean.one/config"
-	"github.com/MixinNetwork/ocean.one/engine"
-	"github.com/MixinNetwork/ocean.one/persistence"
+	"github.com/fox-one/ocean.one/config"
+	"github.com/fox-one/ocean.one/engine"
+	"github.com/fox-one/ocean.one/mixin"
+	"github.com/fox-one/ocean.one/persistence"
 	"github.com/satori/go.uuid"
 	"github.com/ugorji/go/codec"
 )
@@ -24,8 +25,12 @@ type Exchange struct {
 	books     map[string]*engine.Book
 	codec     codec.Handle
 	snapshots map[string]bool
-	brokers   map[string]*persistence.Broker
-	mutexes   *tmap
+
+	brokers map[string]*persistence.Broker
+	mutexes *tmap
+
+	persist     persistence.Persist
+	mixinClient *mixin.Client
 }
 
 func QuotePrecision(assetId string) uint8 {
@@ -56,18 +61,21 @@ func QuoteMinimum(assetId string) number.Decimal {
 	return number.Zero()
 }
 
-func NewExchange() *Exchange {
+func NewExchange(persist persistence.Persist, mixinClient *mixin.Client) *Exchange {
 	return &Exchange{
 		codec:     new(codec.MsgpackHandle),
 		books:     make(map[string]*engine.Book),
 		snapshots: make(map[string]bool),
 		brokers:   make(map[string]*persistence.Broker),
 		mutexes:   newTmap(),
+
+		persist:     persist,
+		mixinClient: mixinClient,
 	}
 }
 
 func (ex *Exchange) Run(ctx context.Context) {
-	brokers, err := persistence.AllBrokers(ctx, true)
+	brokers, err := ex.persist.AllBrokers(ctx, true)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -83,7 +91,7 @@ func (ex *Exchange) Run(ctx context.Context) {
 func (ex *Exchange) PollOrderActions(ctx context.Context) {
 	checkpoint, limit := time.Time{}, 500
 	for {
-		actions, err := persistence.ListPendingActions(ctx, checkpoint, limit)
+		actions, err := ex.persist.ListPendingActions(ctx, checkpoint, limit)
 		if err != nil {
 			log.Println("ListPendingActions", err)
 			time.Sleep(PollInterval)
@@ -102,7 +110,7 @@ func (ex *Exchange) PollOrderActions(ctx context.Context) {
 func (ex *Exchange) PollTransfers(ctx context.Context, brokerId string) {
 	limit := 500
 	for {
-		transfers, err := persistence.ListPendingTransfers(ctx, brokerId, limit)
+		transfers, err := ex.persist.ListPendingTransfers(ctx, brokerId, limit)
 		if err != nil {
 			log.Println("ListPendingTransfers", brokerId, err)
 			time.Sleep(PollInterval)
@@ -112,7 +120,7 @@ func (ex *Exchange) PollTransfers(ctx context.Context, brokerId string) {
 			ex.ensureProcessTransfer(ctx, t)
 		}
 		for {
-			err = persistence.ExpireTransfers(ctx, transfers)
+			err = ex.persist.ExpireTransfers(ctx, transfers)
 			if err == nil {
 				break
 			}
@@ -153,7 +161,7 @@ func (ex *Exchange) processTransfer(ctx context.Context, transfer *persistence.T
 	case persistence.TransferSourceOrderInvalid:
 		data = &TransferAction{S: "REFUND", O: uuid.FromStringOrNil(transfer.Detail)}
 	case persistence.TransferSourceTradeConfirmed:
-		trade, err := persistence.ReadTransferTrade(ctx, transfer.Detail, transfer.AssetId)
+		trade, err := ex.persist.ReadTransferTrade(ctx, transfer.Detail, transfer.AssetId)
 		if err != nil {
 			return err
 		}
@@ -180,7 +188,7 @@ func (ex *Exchange) processTransfer(ctx context.Context, transfer *persistence.T
 func (ex *Exchange) buildBook(ctx context.Context, market string) *engine.Book {
 	return engine.NewBook(ctx, market, func(taker, maker *engine.Order, amount number.Integer) string {
 		for {
-			tradeId, err := persistence.Transact(ctx, taker, maker, amount)
+			tradeId, err := ex.persist.Transact(ctx, taker, maker, amount)
 			if err == nil {
 				return tradeId
 			}
@@ -189,7 +197,7 @@ func (ex *Exchange) buildBook(ctx context.Context, market string) *engine.Book {
 		}
 	}, func(order *engine.Order) {
 		for {
-			err := persistence.CancelOrder(ctx, order)
+			err := ex.persist.CancelOrder(ctx, order)
 			if err == nil {
 				break
 			}
@@ -234,7 +242,7 @@ func (ex *Exchange) ensureProcessOrderAction(ctx context.Context, action *persis
 func (ex *Exchange) PollMixinNetwork(ctx context.Context) {
 	const limit = 500
 	for {
-		checkpoint, err := persistence.ReadPropertyAsTime(ctx, CheckpointMixinNetworkSnapshots)
+		checkpoint, err := ex.persist.ReadPropertyAsTime(ctx, CheckpointMixinNetworkSnapshots)
 		if err != nil {
 			log.Println("ReadPropertyAsTime CheckpointMixinNetworkSnapshots", err)
 			time.Sleep(PollInterval)
@@ -260,7 +268,7 @@ func (ex *Exchange) PollMixinNetwork(ctx context.Context) {
 		if len(snapshots) < limit {
 			time.Sleep(PollInterval)
 		}
-		err = persistence.WriteTimeProperty(ctx, CheckpointMixinNetworkSnapshots, checkpoint)
+		err = ex.persist.WriteTimeProperty(ctx, CheckpointMixinNetworkSnapshots, checkpoint)
 		if err != nil {
 			log.Println("WriteTimeProperty CheckpointMixinNetworkSnapshots", err)
 		}

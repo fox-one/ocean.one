@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/MixinNetwork/go-number"
-	"github.com/MixinNetwork/ocean.one/cache"
+	"github.com/fox-one/ocean.one/cache"
 )
 
 const (

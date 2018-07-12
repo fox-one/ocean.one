@@ -1,4 +1,4 @@
-package main
+package exchange
 
 import (
 	"context"
@@ -12,11 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/MixinNetwork/bot-api-go-client"
+	bot "github.com/MixinNetwork/bot-api-go-client"
 	"github.com/MixinNetwork/go-number"
-	"github.com/MixinNetwork/ocean.one/config"
-	"github.com/MixinNetwork/ocean.one/engine"
-	"github.com/MixinNetwork/ocean.one/persistence"
+	"github.com/fox-one/ocean.one/engine"
 	"github.com/satori/go.uuid"
 	"github.com/ugorji/go/codec"
 )
@@ -88,10 +86,10 @@ func (ex *Exchange) processSnapshot(ctx context.Context, s *Snapshot) error {
 		return ex.refundSnapshot(ctx, s)
 	}
 	if len(action.U) > 16 {
-		return persistence.UpdateUserPublicKey(ctx, s.OpponentId, hex.EncodeToString(action.U))
+		return ex.persist.UpdateUserPublicKey(ctx, s.OpponentId, hex.EncodeToString(action.U))
 	}
 	if action.O.String() != uuid.Nil.String() {
-		return persistence.CancelOrderAction(ctx, action.O.String(), s.CreatedAt, s.OpponentId)
+		return ex.persist.CancelOrderAction(ctx, action.O.String(), s.CreatedAt, s.OpponentId)
 	}
 
 	if action.A.String() == s.Asset.AssetId {
@@ -145,7 +143,7 @@ func (ex *Exchange) processSnapshot(ctx context.Context, s *Snapshot) error {
 		}
 	}
 
-	return persistence.CreateOrderAction(ctx, &engine.Order{
+	return ex.persist.CreateOrderAction(ctx, &engine.Order{
 		Id:              s.TraceId,
 		Type:            action.T,
 		Side:            action.S,
@@ -191,7 +189,8 @@ func (ex *Exchange) refundSnapshot(ctx context.Context, s *Snapshot) error {
 	if amount.Exhausted() {
 		return nil
 	}
-	return persistence.CreateRefundTransfer(ctx, s.UserId, s.OpponentId, s.Asset.AssetId, amount, s.TraceId)
+
+	return ex.persist.CreateRefundTransfer(ctx, s.UserId, s.OpponentId, s.Asset.AssetId, amount, s.TraceId)
 }
 
 func (ex *Exchange) decryptOrderAction(ctx context.Context, data string) (*OrderAction, error) {
@@ -225,11 +224,7 @@ func (ex *Exchange) decryptOrderAction(ctx context.Context, data string) (*Order
 
 func (ex *Exchange) requestMixinNetwork(ctx context.Context, checkpoint time.Time, limit int) ([]*Snapshot, error) {
 	uri := fmt.Sprintf("/network/snapshots?offset=%s&order=ASC&limit=%d", checkpoint.Format(time.RFC3339Nano), limit)
-	token, err := bot.SignAuthenticationToken(config.ClientId, config.SessionId, config.SessionKey, "GET", uri, "")
-	if err != nil {
-		return nil, err
-	}
-	body, err := bot.Request(ctx, "GET", uri, nil, token)
+	body, err := ex.mixinClient.SendRequest(ctx, "GET", uri, nil)
 	if err != nil {
 		return nil, err
 	}

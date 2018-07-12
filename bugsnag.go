@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/MixinNetwork/ocean.one/config"
 	"github.com/bugsnag/bugsnag-go"
+	"github.com/fox-one/ocean.one/config"
 )
 
 func setupBugsnag() {
