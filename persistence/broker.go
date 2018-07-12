@@ -37,8 +37,8 @@ type Broker struct {
 	DecryptedPIN string `spanner:"-"`
 }
 
-func AllBrokers(ctx context.Context, decryptPIN bool) ([]*Broker, error) {
-	it := Spanner(ctx).Single().Query(ctx, spanner.Statement{SQL: "SELECT * FROM brokers"})
+func (p *Spanner) AllBrokers(ctx context.Context, decryptPIN bool) ([]*Broker, error) {
+	it := p.spanner.Single().Query(ctx, spanner.Statement{SQL: "SELECT * FROM brokers"})
 	defer it.Stop()
 
 	brokers := []*Broker{
@@ -73,7 +73,7 @@ func AllBrokers(ctx context.Context, decryptPIN bool) ([]*Broker, error) {
 	}
 }
 
-func AddBroker(ctx context.Context) (*Broker, error) {
+func (p *Spanner) AddBroker(ctx context.Context) (*Broker, error) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 1024)
 	if err != nil {
 		return nil, err
@@ -135,7 +135,7 @@ func AddBroker(ctx context.Context) (*Broker, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = Spanner(ctx).Apply(ctx, []*spanner.Mutation{insertBroker})
+	_, err = p.spanner.Apply(ctx, []*spanner.Mutation{insertBroker})
 	return broker, err
 }
 

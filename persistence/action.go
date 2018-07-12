@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/spanner"
-	"github.com/MixinNetwork/ocean.one/engine"
+	"github.com/fox-one/ocean.one/engine"
 	"google.golang.org/api/iterator"
 )
 
@@ -41,8 +41,8 @@ type Action struct {
 	Order *Order `spanner:"-"`
 }
 
-func CountPendingActions(ctx context.Context) (int64, error) {
-	it := Spanner(ctx).Single().Query(ctx, spanner.Statement{
+func (p *Spanner) CountPendingActions(ctx context.Context) (int64, error) {
+	it := p.spanner.Single().Query(ctx, spanner.Statement{
 		SQL: "SELECT COUNT(*) FROM actions",
 	})
 	defer it.Stop()
@@ -58,8 +58,8 @@ func CountPendingActions(ctx context.Context) (int64, error) {
 	return count, err
 }
 
-func ListPendingActions(ctx context.Context, checkpoint time.Time, limit int) ([]*Action, error) {
-	txn := Spanner(ctx).ReadOnlyTransaction()
+func (p *Spanner) ListPendingActions(ctx context.Context, checkpoint time.Time, limit int) ([]*Action, error) {
+	txn := p.spanner.ReadOnlyTransaction()
 	defer txn.Close()
 
 	it := txn.Query(ctx, spanner.Statement{
@@ -118,7 +118,7 @@ func ListPendingActions(ctx context.Context, checkpoint time.Time, limit int) ([
 	return actions, nil
 }
 
-func CreateOrderAction(ctx context.Context, o *engine.Order, userId, brokerId string, createdAt time.Time) error {
+func (p *Spanner) CreateOrderAction(ctx context.Context, o *engine.Order, userId, brokerId string, createdAt time.Time) error {
 	if !o.FilledFunds.IsZero() || !o.FilledAmount.IsZero() {
 		log.Panicln(userId, o)
 	}
@@ -143,7 +143,7 @@ func CreateOrderAction(ctx context.Context, o *engine.Order, userId, brokerId st
 		Action:    engine.OrderActionCreate,
 		CreatedAt: createdAt,
 	}
-	_, err := Spanner(ctx).ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+	_, err := p.spanner.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		state, err := checkOrderState(ctx, txn, action.OrderId)
 		if err != nil || state != nil {
 			return err
@@ -161,13 +161,13 @@ func CreateOrderAction(ctx context.Context, o *engine.Order, userId, brokerId st
 	return err
 }
 
-func CancelOrderAction(ctx context.Context, orderId string, createdAt time.Time, userId string) error {
+func (p *Spanner) CancelOrderAction(ctx context.Context, orderId string, createdAt time.Time, userId string) error {
 	action := Action{
 		OrderId:   orderId,
 		Action:    engine.OrderActionCancel,
 		CreatedAt: createdAt,
 	}
-	_, err := Spanner(ctx).ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+	_, err := p.spanner.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		exist, err := checkActionExistence(ctx, txn, action.OrderId, action.Action)
 		if err != nil || exist {
 			return err

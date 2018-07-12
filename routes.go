@@ -12,19 +12,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/MixinNetwork/ocean.one/cache"
-	"github.com/MixinNetwork/ocean.one/config"
-	"github.com/MixinNetwork/ocean.one/persistence"
 	"github.com/bugsnag/bugsnag-go/errors"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/dimfeld/httptreemux"
+	"github.com/fox-one/ocean.one/cache"
+	"github.com/fox-one/ocean.one/config"
+	"github.com/fox-one/ocean.one/persistence"
 	"github.com/unrolled/render"
 )
 
-type R struct{}
+type R struct {
+	persist persistence.Persist
+}
 
-func NewRouter() *httptreemux.TreeMux {
-	router, impl := httptreemux.New(), &R{}
+func NewRouter(persist persistence.Persist) *httptreemux.TreeMux {
+	router, impl := httptreemux.New(), &R{persist: persist}
 	router.GET("/brokers", impl.brokers)
 	router.GET("/markets/:id/ticker", impl.marketTicker)
 	router.GET("/markets/:id/book", impl.marketBook)
@@ -36,7 +38,7 @@ func NewRouter() *httptreemux.TreeMux {
 }
 
 func (impl *R) brokers(w http.ResponseWriter, r *http.Request, _ map[string]string) {
-	brokers, err := persistence.AllBrokers(r.Context(), false)
+	brokers, err := impl.persist.AllBrokers(r.Context(), false)
 	if err != nil {
 		render.New().JSON(w, http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 		return
@@ -108,7 +110,7 @@ func (impl *R) tokens(w http.ResponseWriter, r *http.Request, _ map[string]strin
 }
 
 func (impl *R) marketTicker(w http.ResponseWriter, r *http.Request, params map[string]string) {
-	t, err := persistence.LastTrade(r.Context(), params["id"])
+	t, err := impl.persist.LastTrade(r.Context(), params["id"])
 	if err != nil {
 		render.New().JSON(w, http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 		return
@@ -163,7 +165,7 @@ func (impl *R) marketTrades(w http.ResponseWriter, r *http.Request, params map[s
 	order := r.URL.Query().Get("order")
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := time.Parse(time.RFC3339Nano, r.URL.Query().Get("offset"))
-	trades, err := persistence.MarketTrades(r.Context(), params["id"], offset, order, limit)
+	trades, err := impl.persist.MarketTrades(r.Context(), params["id"], offset, order, limit)
 	if err != nil {
 		render.New().JSON(w, http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 		return
@@ -185,7 +187,7 @@ func (impl *R) marketTrades(w http.ResponseWriter, r *http.Request, params map[s
 }
 
 func (impl *R) orders(w http.ResponseWriter, r *http.Request, params map[string]string) {
-	userId, err := authenticateUser(r)
+	userId, err := impl.authenticateUser(r)
 	if err != nil {
 		render.New().JSON(w, http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 		return
@@ -200,7 +202,7 @@ func (impl *R) orders(w http.ResponseWriter, r *http.Request, params map[string]
 	state := r.URL.Query().Get("state")
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := time.Parse(time.RFC3339Nano, r.URL.Query().Get("offset"))
-	orders, err := persistence.UserOrders(r.Context(), userId, market, state, offset, order, limit)
+	orders, err := impl.persist.UserOrders(r.Context(), userId, market, state, offset, order, limit)
 	if err != nil {
 		render.New().JSON(w, http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 		return
@@ -226,12 +228,12 @@ func (impl *R) orders(w http.ResponseWriter, r *http.Request, params map[string]
 	render.New().JSON(w, http.StatusOK, map[string]interface{}{"data": data})
 }
 
-func authenticateUser(r *http.Request) (string, error) {
+func (impl *R) authenticateUser(r *http.Request) (string, error) {
 	header := r.Header.Get("Authorization")
 	if !strings.HasPrefix(header, "Bearer ") {
 		return "", nil
 	}
-	return persistence.Authenticate(r.Context(), header[7:])
+	return impl.persist.Authenticate(r.Context(), header[7:])
 }
 
 func registerHanders(router *httptreemux.TreeMux) {

@@ -8,7 +8,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"github.com/MixinNetwork/go-number"
-	"github.com/MixinNetwork/ocean.one/engine"
+	"github.com/fox-one/ocean.one/engine"
 	"github.com/satori/go.uuid"
 )
 
@@ -36,7 +36,7 @@ type Trade struct {
 	FeeAmount    string    `spanner:"fee_amount"`
 }
 
-func Transact(ctx context.Context, taker, maker *engine.Order, amount number.Integer) (string, error) {
+func (p *Spanner) Transact(ctx context.Context, taker, maker *engine.Order, amount number.Integer) (string, error) {
 	askTrade, bidTrade := makeTrades(taker, maker, amount.Decimal())
 	askTransfer, bidTransfer := handleFees(askTrade, bidTrade, taker, maker)
 
@@ -61,11 +61,11 @@ func Transact(ctx context.Context, taker, maker *engine.Order, amount number.Int
 	mutations := makeOrderMutations(taker, maker)
 	mutations = append(mutations, askTradeMutation, bidTradeMutation)
 	mutations = append(mutations, askTransferMutation, bidTransferMutation)
-	_, err = Spanner(ctx).Apply(ctx, mutations)
+	_, err = p.spanner.Apply(ctx, mutations)
 	return askTrade.TradeId, err
 }
 
-func CancelOrder(ctx context.Context, order *engine.Order) error {
+func (p *Spanner) CancelOrder(ctx context.Context, order *engine.Order) error {
 	orderCols := []string{"order_id", "filled_amount", "remaining_amount", "filled_funds", "remaining_funds", "state"}
 	orderVals := []interface{}{order.Id, order.FilledAmount.Persist(), order.RemainingAmount.Persist(), order.FilledFunds.Persist(), order.RemainingFunds.Persist(), OrderStateDone}
 	mutations := []*spanner.Mutation{
@@ -93,7 +93,7 @@ func CancelOrder(ctx context.Context, order *engine.Order) error {
 		return err
 	}
 	mutations = append(mutations, transferMutation)
-	_, err = Spanner(ctx).Apply(ctx, mutations)
+	_, err = p.spanner.Apply(ctx, mutations)
 	return err
 }
 

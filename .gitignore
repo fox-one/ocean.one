@@ -17,3 +17,4 @@ config.go
 
 dist/
 node_modules/
+*/config.*.go
