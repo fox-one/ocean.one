@@ -18,3 +18,4 @@ config.go
 dist/
 node_modules/
 */config.*.go
+.DS_Store
