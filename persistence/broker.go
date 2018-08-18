@@ -19,7 +19,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"github.com/MixinNetwork/bot-api-go-client"
-	"github.com/MixinNetwork/ocean.one/config"
+	"github.com/fox-one/ocean.one/config"
 	"google.golang.org/api/iterator"
 )
 
