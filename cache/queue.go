@@ -100,6 +100,7 @@ func (queue *Queue) handleEvent(ctx context.Context, e *Event) error {
 		if err != nil {
 			return err
 		}
+		cacheOrderEvent(e.Market, e.Type, e.Data)
 	case "BOOK-T0":
 		_, err := Redis(ctx).Pipelined(func(pipe redis.Pipeliner) error {
 			pipe.Del(key)
@@ -110,6 +111,8 @@ func (queue *Queue) handleEvent(ctx context.Context, e *Event) error {
 		if err != nil {
 			return err
 		}
+		cacheBookT0(e.Market, data)
+
 		data, _ = json.Marshal(Event{
 			Market:    queue.market,
 			Type:      "HEARTBEAT",
