@@ -216,10 +216,6 @@ func (book *Book) Run(ctx context.Context) {
 	}
 }
 
-func (book *Book) Orderbooks(limit int) ([]*Entry, []*Entry) {
-	return book.asks.List(limit, true), book.bids.List(limit, true)
-}
-
 func (book *Book) cacheList(ctx context.Context, limit int) {
 	event := fmt.Sprintf("BOOK-T%d", limit)
 	data := map[string]interface{}{
