@@ -6,9 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/MixinNetwork/bot-api-go-client"
 	"github.com/MixinNetwork/go-number"
-	"github.com/fox-one/ocean.one/config"
 	"github.com/fox-one/ocean.one/engine"
 	"github.com/fox-one/ocean.one/mixin"
 	"github.com/fox-one/ocean.one/persistence"
@@ -83,7 +81,6 @@ func (ex *Exchange) Run(ctx context.Context) {
 		ex.brokers[b.BrokerId] = b
 		go ex.PollTransfers(ctx, b.BrokerId)
 	}
-	go ex.PollMixinMessages(ctx)
 	go ex.PollMixinNetwork(ctx)
 	ex.PollOrderActions(ctx)
 }
@@ -273,18 +270,4 @@ func (ex *Exchange) PollMixinNetwork(ctx context.Context) {
 			log.Println("WriteTimeProperty CheckpointMixinNetworkSnapshots", err)
 		}
 	}
-}
-
-func (ex *Exchange) PollMixinMessages(ctx context.Context) {
-	for {
-		err := bot.Loop(ctx, ex, config.ClientId, config.SessionId, config.SessionKey)
-		if err != nil {
-			log.Println("PollMixinMessages", err)
-			time.Sleep(1 * time.Second)
-		}
-	}
-}
-
-func (ex *Exchange) OnMessage(ctx context.Context, mc *bot.MessageContext, msg bot.MessageView, userId string) error {
-	return nil
 }
