@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/MixinNetwork/go-number"
@@ -35,6 +36,7 @@ type Book struct {
 	asks        *Page
 	bids        *Page
 	queue       *cache.Queue
+	lock        *sync.RWMutex
 }
 
 func NewBook(ctx context.Context, market string, transact TransactCallback, cancel CancelCallback) *Book {
@@ -48,6 +50,7 @@ func NewBook(ctx context.Context, market string, transact TransactCallback, canc
 		asks:        NewPage(PageSideAsk),
 		bids:        NewPage(PageSideBid),
 		queue:       cache.NewQueue(ctx, market),
+		lock:        &sync.RWMutex{},
 	}
 }
 
@@ -201,13 +204,17 @@ func (book *Book) Run(ctx context.Context) {
 	for {
 		select {
 		case event := <-book.events:
-			if event.Action == OrderActionCreate {
-				book.createOrder(ctx, event.Order)
-			} else if event.Action == OrderActionCancel {
-				book.cancelOrder(ctx, event.Order)
-			} else {
-				log.Panicln(event)
-			}
+			func() {
+				book.lock.Lock()
+				defer book.lock.Unlock()
+				if event.Action == OrderActionCreate {
+					book.createOrder(ctx, event.Order)
+				} else if event.Action == OrderActionCancel {
+					book.cancelOrder(ctx, event.Order)
+				} else {
+					log.Panicln(event)
+				}
+			}()
 		case <-fullCacheTicker.C:
 			book.cacheList(ctx, 0)
 		case <-bestCacheTicker.C:
@@ -217,10 +224,16 @@ func (book *Book) Run(ctx context.Context) {
 }
 
 func (book *Book) Orderbooks(limit int) ([]*Entry, []*Entry) {
+	book.lock.RLock()
+	defer book.lock.RUnlock()
+
 	return book.asks.List(limit, true), book.bids.List(limit, true)
 }
 
 func (book *Book) cacheList(ctx context.Context, limit int) {
+	book.lock.RLock()
+	defer book.lock.RUnlock()
+
 	event := fmt.Sprintf("BOOK-T%d", limit)
 	data := map[string]interface{}{
 		"asks": book.asks.List(limit, true),
