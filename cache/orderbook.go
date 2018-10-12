@@ -2,6 +2,7 @@ package cache
 
 import (
 	"encoding/json"
+	"sync"
 
 	"github.com/MixinNetwork/go-number"
 	"github.com/emirpasic/gods/trees/redblacktree"
@@ -16,6 +17,7 @@ const (
 type OrderBook struct {
 	Asks *redblacktree.Tree
 	Bids *redblacktree.Tree
+	lock *sync.RWMutex
 }
 
 var books = map[string]*OrderBook{}
@@ -46,6 +48,7 @@ func getBook(market string) *OrderBook {
 	book := &OrderBook{
 		Asks: newPage(PageSideAsk),
 		Bids: newPage(PageSideBid),
+		lock: &sync.RWMutex{},
 	}
 	books[market] = book
 	return book
@@ -109,6 +112,8 @@ func cacheOrderEvent(market, eventType string, data map[string]interface{}) {
 		break
 	}
 
+	book.lock.Lock()
+	defer book.lock.Unlock()
 	addEntry(page, price, amount)
 }
 
@@ -131,5 +136,8 @@ func Orderbooks(market string, count int) ([]*models.OrderBookReply_OrderBook, [
 	}
 
 	book := getBook(market)
+
+	book.lock.RLock()
+	defer book.lock.RUnlock()
 	return listFunc(book.Asks, count), listFunc(book.Bids, count)
 }
