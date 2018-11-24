@@ -78,9 +78,9 @@ module.exports = {
       template: './src/layout.html'
     }),
     new FaviconsWebpackPlugin({
-      logo: './src/launcher.png',
+      logo: './src/favicon-512.png',
       prefix: 'icons-[hash]-',
-      background: '#FFFFFF'
+      background: 'rgba(0,0,0,0)'
     }),
     new ScriptExtHtmlWebpackPlugin({
       defaultAttribute: 'async'
