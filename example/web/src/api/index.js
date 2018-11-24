@@ -91,7 +91,7 @@ API.prototype = {
       switch (resp.error.code) {
         case 401:
           this.account.clear();
-          this.router.replace('/sessions/new');
+          this.router.replace('/#!/sessions/new');
           break;
         case 404:
           $('#layout-container').html(this.Error404());

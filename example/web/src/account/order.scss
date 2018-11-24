@@ -13,14 +13,14 @@
 .navi {
   text-align: right;
   .item {
-    border: 1px solid rgba(0,0,0,0.1);
+    border: 1px solid rgba(255,255,255,0.1);
     border-radius: 2px;
-    color: #000;
+    color: #ccc;
     display: inline-block;
     padding: 0.3rem 0.6rem;
     margin-left: 0.8rem;
     &.active, &:hover {
-      background-color: rgba(0,0,0,0.05);
+      background-color: rgba(255,255,255,0.05);
     }
   }
 }
@@ -61,7 +61,7 @@
   }
 
   tr {
-    border-bottom: 1px solid rgba(0,0,0,0.05);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
 
     &:last-child {
       border-bottom: none;
@@ -69,7 +69,7 @@
   }
 
   thead {
-    border-bottom: 1px solid rgba(0,0,0,0.05);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
   }
 
   td {

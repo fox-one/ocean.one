@@ -71,13 +71,13 @@ Market.prototype = {
     }));
 
     if (self.api.account.token() === '') {
-      $('.account.sign.out.button').hide();
-      $('.account.sign.in.button').show();
+      $('.nav-item.signout').hide();
+      $('.nav-item.signin').show();
       $('.account.in.actions').hide();
       $('.account.out.actions').show();
     } else {
-      $('.account.sign.in.button').hide();
-      $('.account.sign.out.button').show();
+      $('.nav-item.signin').hide();
+      $('.nav-item.signout').show();
       $('.account.in.actions').show();
       $('.account.out.actions').hide();
       $('.layout.header').remove();
@@ -107,7 +107,7 @@ Market.prototype = {
         $('.layout.header').toggle();
         $('.layout.nav').show();
       } else {
-        window.location.href = '/trade/' + $(this).data('symbol');
+        window.location.href = '/#!/trade/' + $(this).data('symbol');
       }
     });
 
@@ -178,7 +178,7 @@ Market.prototype = {
 
     self.handlePageScroll();
 
-    $('.layout.nav .logo a, .layout.nav .title').click(function(event) {
+    $('.layout.nav .logo a, .layout.nav .nav-item.list').click(function(event) {
       event.preventDefault();
       $('.layout.header').toggleClass('invisible');
       if ($('.layout.header').hasClass('invisible')) {

@@ -7,13 +7,13 @@
   height: 100vh;
   background: $color-main-background;
   box-sizing: border-box;
-  padding-top: 64px;
+  padding-left: 80px;
 }
 
 .header.container {
   width: 100%;
   height: 64px;
-  border-bottom: 1px solid rgba(0,0,0,0.07);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
   box-sizing: border-box;
   padding: 16px 32px;
   display: flex;
@@ -62,7 +62,7 @@
   flex: 1;
   margin: 0 auto;
   height: calc(100%);
-  border-right: 1px solid rgba(0,0,0,0.07);
+  border-right: 1px solid rgba(255,255,255,0.07);
 
   .icon {
     display: none;
@@ -86,7 +86,7 @@
     margin: 0;
     padding: 0;
     display: flex;
-    border-bottom: 1px solid rgba(0,0,0,0.07);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
 
     li {
       flex: 1;
@@ -100,7 +100,7 @@
       text-align: center;
 
       &.active {
-        background: rgba(0,0,0,0.07);
+        background: rgba(255,255,255,0.07);
       }
 
       &.depth {
@@ -111,12 +111,12 @@
 
   .price.chart {
     height: calc(50% - 16px);
-    border-bottom: 1px solid rgba(0,0,0,0.07);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
   }
 
   .depth.chart {
     height: calc(50% - 16px);
-    border-bottom: 1px solid rgba(0,0,0,0.07);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
   }
 
   .highcharts-point-up {
@@ -148,10 +148,14 @@
   font-family: $font-main-mono;
   font-weight: 400;
   font-size: 12px;
-  color: #555555;
-  border-right: 1px solid rgba(0,0,0,0.1);
+  color: #aaa;
+  border-right: 1px solid rgba(255,255,255,0.1);
   box-sizing: border-box;
   display: flex;
+
+  input {
+    background: transparent;
+  }
 
   .tabs {
     z-index: 1;
@@ -175,7 +179,7 @@
     text-align: center;
     text-transform: uppercase;
     cursor: pointer;
-    border-bottom: 2px solid rgba(0,0,0,0.07);
+    border-bottom: 2px solid rgba(255,255,255,0.07);
 
     &.active {
       border-bottom: 2px solid $color-main-highlight;
@@ -243,7 +247,7 @@
     }
 
     &:hover {
-      background: rgba(0,0,0,0.05) !important;
+      background: rgba(255,255,255,0.05) !important;
     }
 
     &.spread {
@@ -283,7 +287,7 @@
   position: relative;
   overflow: hidden;
   box-sizing: border-box;
-  color: #555555;
+  color: #aaa;
 
   .tabs {
     display: flex;
@@ -306,7 +310,7 @@
   }
 
   .type.tab {
-    border-bottom: 2px solid rgba(0,0,0,0.07);
+    border-bottom: 2px solid rgba(255,255,255,0.07);
 
     &.active {
       border-bottom: 2px solid $color-main-highlight;
@@ -314,7 +318,7 @@
   }
 
   .side.tab {
-    background: rgba(0,0,0,0.07);
+    background: rgba(255,255,255,0.07);
 
     &.buy {
       border-radius: 4px 0 0 4px;
@@ -373,6 +377,8 @@
       box-sizing: border-box;
       padding: 0 8px;
       min-width: 0;
+      background: transparent;
+      color: white;
     }
 
     input[type="submit"],
@@ -388,7 +394,7 @@
       font-weight: 300;
       box-sizing: border-box;
       border-radius: 4px;
-      box-shadow: 0 0 2px rgba(0,0,0,0.1);
+      box-shadow: 0 0 2px rgba(255,255,255,0.1);
       color: $color-main-background;
       cursor: pointer;
 
@@ -436,7 +442,7 @@
       .action {
         flex: 1;
         cursor: pointer;
-        border: 1px solid rgba(0,0,0,0.1);
+        border: 1px solid rgba(255,255,255,0.1);
         color: $color-main-foreground-light;
         border-radius: 2px;
         display: block;
@@ -506,7 +512,7 @@
       padding: 0;
 
       .tab.active {
-        border-bottom: 2px solid rgba(0,0,0,0.1);
+        border-bottom: 2px solid rgba(255,255,255,0.1);
       }
     }
 
@@ -517,7 +523,7 @@
     }
 
     .trade.history {
-      border-left: 1px solid rgba(0,0,0,0.1);
+      border-left: 1px solid rgba(255,255,255,0.1);
     }
   }
 }
@@ -579,7 +585,7 @@
   .trade.form {
     height: 512px;
     width: 50%;
-    border-top: 1px solid rgba(0,0,0,0.1);
+    border-top: 1px solid rgba(255,255,255,0.1);
     margin-top: 16px;
 
     .form {

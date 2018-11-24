@@ -31,12 +31,13 @@
     font-size: 14px;
     font-family: $font-main-mono;
     font-weight: 300;
-    background: rgba(0,0,0,0.07);
-    border: 1px solid rgba(0,0,0,0.07);
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.07);
     border-top: 0 none;
     border-radius: 0 0 2px 2px;
     padding: 8px 16px;
     box-sizing: border-box;
+    color: white;
   }
 
   input.account {
@@ -46,10 +47,10 @@
   .label {
     margin: 0;
     color: $color-main-background;
-    border: 1px solid rgba(0,0,0,0.07);
+    border: 1px solid rgba(255,255,255,0.07);
     border-bottom: 0 none;
     border-radius: 2px 2px 0 0;
-    background: rgba(0,0,0,0.07);
+    background: rgba(255,255,255,0.07);
 
     label {
       margin: 0;
@@ -114,7 +115,7 @@
   }
 
   tr {
-    border-bottom: 1px solid rgba(0,0,0,0.05);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
 
     &:last-child {
       border-bottom: none;
@@ -135,7 +136,7 @@
   .action {
     flex: 1;
     cursor: pointer;
-    border: 1px solid rgba(0,0,0,0.1);
+    border: 1px solid rgba(255,255,255,0.1);
     color: $color-main-foreground-light;
     border-radius: 2px;
     display: inline-block;
@@ -172,7 +173,7 @@
     display: inline-block;
     text-decoration: none;
     background: $color-main-highlight;
-    box-shadow: 0 0 4px rgba(0,0,0,0.3);
+    box-shadow: 0 0 4px rgba(255,255,255,0.3);
     border-radius: 4px;
     color: $color-main-background;
     font-size: 20px;
@@ -195,6 +196,8 @@
     input[type="text"] {
       font-size: 20px;
       letter-spacing: 2px;
+      background: transparent;
+      color: white;
     }
   }
 }

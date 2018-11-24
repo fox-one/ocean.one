@@ -14,7 +14,7 @@ const webRoot = function (env) {
   if (env === 'production') {
     return 'https://ocean.one';
   } else {
-    return 'http://ocean.local';
+    return 'http://localhost:8000';
   }
 };
 
@@ -24,7 +24,7 @@ module.exports = {
   },
 
   output: {
-    publicPath: '/assets/',
+    publicPath: '/',
     path: path.resolve(__dirname, 'dist'),
     filename: '[name]-[chunkHash].js'
   },
@@ -63,17 +63,17 @@ module.exports = {
       WEB_ROOT: JSON.stringify(webRoot(process.env.NODE_ENV)),
       API_ROOT: JSON.stringify("https://example.ocean.one"),
       ENGINE_ROOT: JSON.stringify("wss://events.ocean.one"),
-      APP_NAME: JSON.stringify("Ocean ONE"),
+      APP_NAME: JSON.stringify("F1EX O1 Demo"),
       RECAPTCHA_SITE_KEY: JSON.stringify("6Leo5WkUAAAAACT-jCLijZ1yyFvMMxy_yhoiJa3H")
     }),
-    new CompressionPlugin({
-      asset: "[path]",
-      algorithm: "gzip",
-      test: /\.(js|css)$/,
-      threshold: process.env.NODE_ENV === 'production' ? 0 : 100000000000000,
-      minRatio: 1,
-      deleteOriginalAssets: false
-    }),
+    // new CompressionPlugin({
+    //   asset: "[path]",
+    //   algorithm: "gzip",
+    //   test: /\.(js|css)$/,
+    //   threshold: process.env.NODE_ENV === 'production' ? 0 : 100000000000000,
+    //   minRatio: 1,
+    //   deleteOriginalAssets: false
+    // }),
     new HtmlWebpackPlugin({
       template: './src/layout.html'
     }),

@@ -1,6 +1,6 @@
 <header class="layout header invisible">
   <div class="header overlay">
-    <h1 class="logo"><img src="{{logoURL}}" alt="OceanONE" /></h1>
+    <h1 class="logo"><img src="{{logoURL}}" alt="F1EX" /></h1>
     <h2>{{t 'home.headline'}}</h2>
     <ul class="blockchains list">
       <li><img src="https://images.mixin.one/HvYGJsV5TGeZ-X9Ek3FEQohQZ3fE9LBEBGcOcn4c4BNHovP4fW4YB97Dg5LcXoQ1hUjMEgjbl1DPlKg1TW7kK6XP=s32" alt="Bitcoin" width="32" height="32"></li>
@@ -17,7 +17,7 @@
     </ul>
     <div class="account buttons">
       <a href="/users/new" class="account button">{{t 'home.sign.up'}}</a>
-      <a href="/sessions/new" class="account button">{{t 'home.log.in'}}</a>
+      <a href="/#!/sessions/new" class="account button">{{t 'home.log.in'}}</a>
     </div>
     <div class="external links">
       <a href="https://github.com/MixinNetwork/ocean.one" class="external link">GitHub</a>
@@ -29,10 +29,25 @@
 
 <nav class="layout nav">
   <div class="nav overlay">
-    <h1 class="logo"><a href="javascript:void(0);"><img src="{{symbolURL}}" alt="OceanONE" /></a></h1>
-    <h2 class="title">{{title}}</h2>
-    <a class="account sign out button" href="javascript:void(0);"><i class="icon-power"></i></a>
-    <a class="account sign in button" href="/sessions/new"><i class="icon-login"></i></a>
+    <h1 class="logo"><a href="javascript:void(0);"><img src="{{symbolURL}}" alt="F1EX" /></a></h1>
+    <a class="nav-item list">
+      <span class="lnr lnr-store"></span>
+      <span class="label">LIST</span>
+    </a>
+    <a class="nav-item current">
+      <span class="lnr lnr-coin-dollar"></span>
+      <span class="label">{{title}}</span>
+    </a>
+    <a class="nav-item signout">
+      <span class="lnr lnr-power-switch"></span>
+      <span class="label">Logout</span>
+    </a>
+    <a class="nav-item signin" href="/#!/sessions/new">
+      <span class="lnr lnr-enter"></span>
+      <span class="label">Login</span>
+    </a>
+    <!-- <a class="account sign out button" href="javascript:void(0);"><i class="icon-power"></i></a>
+    <a class="account sign in button" href="/#!/sessions/new"><i class="icon-login"></i></a> -->
   </div>
 </nav>
 

@@ -53,6 +53,7 @@ Chart.prototype = {
 
     var chart = Highcharts.StockChart(ele, {
       chart: {
+        backgroundColor:'rgba(255, 255, 255, 0.0)',
         zoomType: 'none',
         pinchType: 'none',
         panning: false,
@@ -86,6 +87,10 @@ Chart.prototype = {
         }
       },
 
+      xAxis: {
+        lineWidth: 0.3,
+      },
+
       yAxis: [{
         labels: {
           align: 'right',
@@ -95,7 +100,7 @@ Chart.prototype = {
           }
         },
         height: '70%',
-        gridLineWidth: 0.5,
+        gridLineWidth: 0.1,
         lineWidth: 0
       }, {
         labels: {
@@ -105,7 +110,7 @@ Chart.prototype = {
         top: '71%',
         height: '29%',
         offset: 0,
-        gridLineWidth: 0.5,
+        gridLineWidth: 0.1,
         lineWidth: 0
       }],
 
@@ -210,6 +215,7 @@ Chart.prototype = {
 
     var chart = Highcharts.chart(ele, {
       chart: {
+        backgroundColor:'rgba(255, 255, 255, 0.0)',
         zoomType: 'none',
         pinchType: 'none',
         panning: false,
@@ -241,7 +247,8 @@ Chart.prototype = {
       },
 
       xAxis: {
-        gridLineWidth: 0.5,
+        lineWidth: 0.3,
+        gridLineWidth: 0.1,
         min: minPrice,
         max: maxPrice,
         labels: {
@@ -265,7 +272,7 @@ Chart.prototype = {
         resize: {
           enabled: true
         },
-        gridLineWidth: 0.5,
+        gridLineWidth: 0.1,
         max: maxVolume,
         min: 0,
         title: {

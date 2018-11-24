@@ -10,7 +10,7 @@ import Account from './account';
 
 const PartialLoading = require('./loading.html');
 const Error404 = require('./404.html');
-const router = new Navigo(WEB_ROOT);
+const router = new Navigo(WEB_ROOT, true, '#!');
 const api = new API(router, API_ROOT, ENGINE_ROOT);
 
 window.i18n = new Locale(navigator.language);
@@ -71,7 +71,7 @@ router.on({
   router.updatePageLinks();
 }).resolve();
 
-$('body').on('click', '.account.sign.out.button', function () {
+$('body').on('click', '.nav-item.signout', function () {
   api.account.clear();
   window.location.href = '/';
 });
