@@ -12,7 +12,7 @@ const extractSass = new ExtractTextPlugin({
 
 const webRoot = function (env) {
   if (env === 'production') {
-    return 'https://ocean.one';
+    return 'https://exo.fox.one';
   } else {
     return 'http://localhost:8000';
   }

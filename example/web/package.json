@@ -4,6 +4,7 @@
   "description": "F1EX O1 Demo",
   "main": "app.js",
   "scripts": {
+    "pub": "aws s3 cp --recursive dist s3://exo.fox.one/ --acl public-read",
     "test": "echo \"Error: no test specified\" && exit 1",
     "watch": "webpack -w --mode=development",
     "dist": "NODE_ENV=production webpack -p --mode=production"
