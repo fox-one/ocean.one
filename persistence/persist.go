@@ -34,7 +34,7 @@ type Persist interface {
 	UpdateUserPublicKey(ctx context.Context, userId, publicKey string) error
 	Authenticate(ctx context.Context, jwtToken string) (string, error)
 	UserOrders(ctx context.Context, userId string, market, state string, offset time.Time, order string, limit int) ([]*Order, error)
-	OrderTrades(ctx context.Context, orderId string) ([]*Trade, error)
+	OrderTrades(ctx context.Context, userId, orderId string) ([]*Trade, error)
 
 	AllBrokers(ctx context.Context, decryptPIN bool) ([]*Broker, error)
 	AddBroker(ctx context.Context) (*Broker, error)

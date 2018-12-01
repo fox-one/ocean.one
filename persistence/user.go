@@ -171,7 +171,7 @@ func (p *Spanner) UserOrders(ctx context.Context, userId string, market, state s
 	return orders, nil
 }
 
-func (p *Spanner) OrderTrades(ctx context.Context, orderId string) ([]*Trade, error) {
+func (p *Spanner) OrderTrades(ctx context.Context, userId, orderId string) ([]*Trade, error) {
 	// TODO
 	return nil, nil
 }
