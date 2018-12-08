@@ -100,8 +100,18 @@ func (queue *Queue) handleEvent(ctx context.Context, e *Event) error {
 		if err != nil {
 			return err
 		}
+
+		_, err = Redis(ctx).RPush("ORDER-EVENTS", data).Result()
+		if err != nil {
+			return err
+		}
 	case "BOOK-T0":
-		_, err := Redis(ctx).Pipelined(func(pipe redis.Pipeliner) error {
+		_, err := Redis(ctx).RPush("ORDER-EVENTS", data).Result()
+		if err != nil {
+			return err
+		}
+
+		_, err = Redis(ctx).Pipelined(func(pipe redis.Pipeliner) error {
 			pipe.Del(key)
 			pipe.RPush(key, data)
 			pipe.Set(queue.market+"-BOOK-T0", data, 0)
