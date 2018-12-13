@@ -58,6 +58,29 @@ func (p *Spanner) CountPendingActions(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+func (p *Spanner) ReadOrder(ctx context.Context, orderId string) (*Order, error) {
+	it := p.spanner.Single().Query(ctx, spanner.Statement{
+		SQL:    "SELECT * FROM orders WHERE order_id=@order_id",
+		Params: map[string]interface{}{"order_id": orderId},
+	})
+	defer it.Stop()
+
+	for {
+		row, err := it.Next()
+		if err == iterator.Done {
+			return nil, nil
+		} else if err != nil {
+			return nil, err
+		}
+		var order Order
+		err = row.ToStruct(&order)
+		if err != nil {
+			return nil, err
+		}
+		return &order, nil
+	}
+}
+
 func (p *Spanner) ListPendingActions(ctx context.Context, checkpoint time.Time, limit int) ([]*Action, error) {
 	txn := p.spanner.ReadOnlyTransaction()
 	defer txn.Close()

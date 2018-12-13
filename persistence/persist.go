@@ -18,6 +18,7 @@ type Persist interface {
 	ListPendingActions(ctx context.Context, checkpoint time.Time, limit int) ([]*Action, error)
 	CreateOrderAction(ctx context.Context, o *engine.Order, userId, brokerId string, createdAt time.Time) error
 	CancelOrderAction(ctx context.Context, orderId string, createdAt time.Time, userId string) error
+	ReadOrder(ctx context.Context, orderId string) (*Order, error)
 
 	LastTrade(ctx context.Context, market string) (*Trade, error)
 	MarketTrades(ctx context.Context, market string, offset interface{}, order string, limit int) ([]*Trade, error)
