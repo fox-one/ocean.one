@@ -21,7 +21,6 @@ const (
 )
 
 type Trade struct {
-	ID           uint64    `spanner:"id"`
 	TradeId      string    `spanner:"trade_id"`
 	Liquidity    string    `spanner:"liquidity"`
 	AskOrderId   string    `spanner:"ask_order_id"`

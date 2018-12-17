@@ -21,7 +21,7 @@ type Persist interface {
 	ReadOrder(ctx context.Context, orderId string) (*Order, error)
 
 	LastTrade(ctx context.Context, market string) (*Trade, error)
-	MarketTrades(ctx context.Context, market string, offset interface{}, order string, limit int) ([]*Trade, error)
+	MarketTrades(ctx context.Context, market string, offset time.Time, order string, limit int) ([]*Trade, error)
 
 	Transact(ctx context.Context, taker, maker *engine.Order, amount number.Integer) (string, error)
 	CancelOrder(ctx context.Context, order *engine.Order) error

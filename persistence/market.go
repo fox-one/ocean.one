@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/spanner"
 	"github.com/satori/go.uuid"
@@ -34,7 +35,7 @@ func (p *Spanner) LastTrade(ctx context.Context, market string) (*Trade, error) 
 	return &t, err
 }
 
-func (p *Spanner) MarketTrades(ctx context.Context, market string, offset interface{}, order string, limit int) ([]*Trade, error) {
+func (p *Spanner) MarketTrades(ctx context.Context, market string, offset time.Time, order string, limit int) ([]*Trade, error) {
 	txn := p.spanner.ReadOnlyTransaction()
 	defer txn.Close()
 
