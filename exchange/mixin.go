@@ -92,59 +92,68 @@ func (ex *Exchange) processSnapshot(ctx context.Context, s *Snapshot) error {
 		return ex.persist.CancelOrderAction(ctx, action.O.String(), s.CreatedAt, s.OpponentId)
 	}
 
-	if action.A.String() == s.Asset.AssetId {
-		return ex.refundSnapshot(ctx, s)
-	}
-	if action.T != engine.OrderTypeLimit && action.T != engine.OrderTypeMarket {
+	order, ok := ParseOrderAction(action, s.Asset.AssetId, s.Amount)
+	if !ok {
 		return ex.refundSnapshot(ctx, s)
 	}
 
-	quote, base := ex.getQuoteBasePair(s, action)
+	order.Id = s.TraceId
+	return ex.persist.CreateOrderAction(ctx, order, s.OpponentId, s.UserId, s.CreatedAt)
+}
+
+func ParseOrderAction(action *OrderAction, assetID string, amountStr string) (*engine.Order, bool) {
+	if action.A.String() == assetID {
+		return nil, false
+	}
+	if action.T != engine.OrderTypeLimit && action.T != engine.OrderTypeMarket {
+		return nil, false
+	}
+
+	quote, base := getQuoteBasePair(assetID, action)
 	if quote == "" {
-		return ex.refundSnapshot(ctx, s)
+		return nil, false
 	}
 
 	priceDecimal := number.FromString(action.P)
 	maxPrice := number.NewDecimal(MaxPrice, int32(QuotePrecision(quote)))
 	if priceDecimal.Cmp(maxPrice) > 0 {
-		return ex.refundSnapshot(ctx, s)
+		return nil, false
 	}
 	price := priceDecimal.Integer(QuotePrecision(quote))
 	if action.T == engine.OrderTypeLimit {
 		if price.IsZero() {
-			return ex.refundSnapshot(ctx, s)
+			return nil, false
 		}
 	} else if !price.IsZero() {
-		return ex.refundSnapshot(ctx, s)
+		return nil, false
 	}
 
 	fundsPrecision := AmountPrecision + QuotePrecision(quote)
 	funds := number.NewInteger(0, fundsPrecision)
 	amount := number.NewInteger(0, AmountPrecision)
 
-	assetDecimal := number.FromString(s.Amount)
+	assetDecimal := number.FromString(amountStr)
 	if action.S == engine.PageSideBid {
 		maxFunds := number.NewDecimal(MaxFunds, int32(fundsPrecision))
 		if assetDecimal.Cmp(maxFunds) > 0 {
-			return ex.refundSnapshot(ctx, s)
+			return nil, false
 		}
 		funds = assetDecimal.Integer(fundsPrecision)
 		if funds.Decimal().Cmp(QuoteMinimum(quote)) < 0 {
-			return ex.refundSnapshot(ctx, s)
+			return nil, false
 		}
 	} else {
 		maxAmount := number.NewDecimal(MaxAmount, AmountPrecision)
 		if assetDecimal.Cmp(maxAmount) > 0 {
-			return ex.refundSnapshot(ctx, s)
+			return nil, false
 		}
 		amount = assetDecimal.Integer(AmountPrecision)
 		if action.T == engine.OrderTypeLimit && price.Mul(amount).Decimal().Cmp(QuoteMinimum(quote)) < 0 {
-			return ex.refundSnapshot(ctx, s)
+			return nil, false
 		}
 	}
 
-	return ex.persist.CreateOrderAction(ctx, &engine.Order{
-		Id:              s.TraceId,
+	return &engine.Order{
 		Type:            action.T,
 		Side:            action.S,
 		Quote:           quote,
@@ -154,15 +163,15 @@ func (ex *Exchange) processSnapshot(ctx context.Context, s *Snapshot) error {
 		FilledAmount:    amount.Zero(),
 		RemainingFunds:  funds,
 		FilledFunds:     funds.Zero(),
-	}, s.OpponentId, s.UserId, s.CreatedAt)
+	}, true
 }
 
-func (ex *Exchange) getQuoteBasePair(s *Snapshot, a *OrderAction) (string, string) {
+func getQuoteBasePair(assetID string, a *OrderAction) (string, string) {
 	var quote, base string
 	if a.S == engine.PageSideAsk {
-		quote, base = a.A.String(), s.Asset.AssetId
+		quote, base = a.A.String(), assetID
 	} else if a.S == engine.PageSideBid {
-		quote, base = s.Asset.AssetId, a.A.String()
+		quote, base = assetID, a.A.String()
 	} else {
 		return "", ""
 	}
