@@ -92,8 +92,8 @@ func (ex *Exchange) processSnapshot(ctx context.Context, s *Snapshot) error {
 		return ex.persist.CancelOrderAction(ctx, action.O.String(), s.CreatedAt, s.OpponentId)
 	}
 
-	order, ok := ParseOrderAction(action, s.Asset.AssetId, s.Amount)
-	if !ok {
+	order, err := ParseOrderAction(action, s.Asset.AssetId, s.Amount)
+	if err != nil {
 		return ex.refundSnapshot(ctx, s)
 	}
 
@@ -101,31 +101,31 @@ func (ex *Exchange) processSnapshot(ctx context.Context, s *Snapshot) error {
 	return ex.persist.CreateOrderAction(ctx, order, s.OpponentId, s.UserId, s.CreatedAt)
 }
 
-func ParseOrderAction(action *OrderAction, assetID string, amountStr string) (*engine.Order, bool) {
+func ParseOrderAction(action *OrderAction, assetID string, amountStr string) (*engine.Order, error) {
 	if action.A.String() == assetID {
-		return nil, false
+		return nil, fmt.Errorf("same base / quote asset id")
 	}
 	if action.T != engine.OrderTypeLimit && action.T != engine.OrderTypeMarket {
-		return nil, false
+		return nil, fmt.Errorf("invalid order type")
 	}
 
 	quote, base := getQuoteBasePair(assetID, action)
 	if quote == "" {
-		return nil, false
+		return nil, fmt.Errorf("invalid base / quote asset id")
 	}
 
 	priceDecimal := number.FromString(action.P)
 	maxPrice := number.NewDecimal(MaxPrice, int32(QuotePrecision(quote)))
 	if priceDecimal.Cmp(maxPrice) > 0 {
-		return nil, false
+		return nil, fmt.Errorf("price too high")
 	}
 	price := priceDecimal.Integer(QuotePrecision(quote))
 	if action.T == engine.OrderTypeLimit {
 		if price.IsZero() {
-			return nil, false
+			return nil, fmt.Errorf("price too low")
 		}
 	} else if !price.IsZero() {
-		return nil, false
+		return nil, fmt.Errorf("Market Order price must be 0")
 	}
 
 	fundsPrecision := AmountPrecision + QuotePrecision(quote)
@@ -136,20 +136,23 @@ func ParseOrderAction(action *OrderAction, assetID string, amountStr string) (*e
 	if action.S == engine.PageSideBid {
 		maxFunds := number.NewDecimal(MaxFunds, int32(fundsPrecision))
 		if assetDecimal.Cmp(maxFunds) > 0 {
-			return nil, false
+			return nil, fmt.Errorf("amount too high")
 		}
 		funds = assetDecimal.Integer(fundsPrecision)
 		if funds.Decimal().Cmp(QuoteMinimum(quote)) < 0 {
-			return nil, false
+			return nil, fmt.Errorf("amount to low")
+		}
+		if action.T == engine.OrderTypeLimit && !amount.Div(price).Decimal().Round(AmountPrecision).IsPositive() {
+			return nil, fmt.Errorf("amount to low")
 		}
 	} else {
 		maxAmount := number.NewDecimal(MaxAmount, AmountPrecision)
 		if assetDecimal.Cmp(maxAmount) > 0 {
-			return nil, false
+			return nil, fmt.Errorf("amount to high")
 		}
 		amount = assetDecimal.Integer(AmountPrecision)
 		if action.T == engine.OrderTypeLimit && price.Mul(amount).Decimal().Cmp(QuoteMinimum(quote)) < 0 {
-			return nil, false
+			return nil, fmt.Errorf("amount to low")
 		}
 	}
 
@@ -163,7 +166,7 @@ func ParseOrderAction(action *OrderAction, assetID string, amountStr string) (*e
 		FilledAmount:    amount.Zero(),
 		RemainingFunds:  funds,
 		FilledFunds:     funds.Zero(),
-	}, true
+	}, nil
 }
 
 func getQuoteBasePair(assetID string, a *OrderAction) (string, string) {
