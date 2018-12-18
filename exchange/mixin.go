@@ -178,10 +178,17 @@ func ParseOrderAction(action *OrderAction, assetID string, amountStr string) (*e
 }
 
 func getQuoteBasePair(assetID string, a *OrderAction) (string, string) {
+	side := a.S
+	switch side {
+	case "A":
+		side = engine.PageSideAsk
+	case "B":
+		side = engine.PageSideBid
+	}
 	var quote, base string
-	if a.S == engine.PageSideAsk {
+	if side == engine.PageSideAsk {
 		quote, base = a.A.String(), assetID
-	} else if a.S == engine.PageSideBid {
+	} else if side == engine.PageSideBid {
 		quote, base = assetID, a.A.String()
 	} else {
 		return "", ""
