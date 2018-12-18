@@ -105,7 +105,15 @@ func ParseOrderAction(action *OrderAction, assetID string, amountStr string) (*e
 	if action.A.String() == assetID {
 		return nil, fmt.Errorf("same base / quote asset id")
 	}
-	if action.T != engine.OrderTypeLimit && action.T != engine.OrderTypeMarket {
+	orderType := action.T
+	switch orderType {
+	case "L":
+		orderType = engine.OrderTypeLimit
+	case "M":
+		orderType = engine.OrderTypeMarket
+	}
+
+	if orderType != engine.OrderTypeLimit && orderType != engine.OrderTypeMarket {
 		return nil, fmt.Errorf("invalid order type")
 	}
 
@@ -120,7 +128,7 @@ func ParseOrderAction(action *OrderAction, assetID string, amountStr string) (*e
 		return nil, fmt.Errorf("price too high")
 	}
 	price := priceDecimal.Integer(QuotePrecision(quote))
-	if action.T == engine.OrderTypeLimit {
+	if orderType == engine.OrderTypeLimit {
 		if price.IsZero() {
 			return nil, fmt.Errorf("price too low")
 		}
@@ -142,7 +150,7 @@ func ParseOrderAction(action *OrderAction, assetID string, amountStr string) (*e
 		if funds.Decimal().Cmp(QuoteMinimum(quote)) < 0 {
 			return nil, fmt.Errorf("amount to low")
 		}
-		if action.T == engine.OrderTypeLimit && !amount.Div(price).Decimal().Round(AmountPrecision).IsPositive() {
+		if orderType == engine.OrderTypeLimit && !amount.Div(price).Decimal().Round(AmountPrecision).IsPositive() {
 			return nil, fmt.Errorf("amount to low")
 		}
 	} else {
@@ -151,13 +159,13 @@ func ParseOrderAction(action *OrderAction, assetID string, amountStr string) (*e
 			return nil, fmt.Errorf("amount to high")
 		}
 		amount = assetDecimal.Integer(AmountPrecision)
-		if action.T == engine.OrderTypeLimit && price.Mul(amount).Decimal().Cmp(QuoteMinimum(quote)) < 0 {
+		if orderType == engine.OrderTypeLimit && price.Mul(amount).Decimal().Cmp(QuoteMinimum(quote)) < 0 {
 			return nil, fmt.Errorf("amount to low")
 		}
 	}
 
 	return &engine.Order{
-		Type:            action.T,
+		Type:            orderType,
 		Side:            action.S,
 		Quote:           quote,
 		Base:            base,
