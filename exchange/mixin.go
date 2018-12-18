@@ -117,7 +117,15 @@ func ParseOrderAction(action *OrderAction, assetID string, amountStr string) (*e
 		return nil, fmt.Errorf("invalid order type")
 	}
 
-	quote, base := getQuoteBasePair(assetID, action)
+	side := action.S
+	switch side {
+	case "A":
+		side = engine.PageSideAsk
+	case "B":
+		side = engine.PageSideBid
+	}
+
+	quote, base := getQuoteBasePair(assetID, action.A.String(), side)
 	if quote == "" {
 		return nil, fmt.Errorf("invalid base / quote asset id")
 	}
@@ -141,7 +149,7 @@ func ParseOrderAction(action *OrderAction, assetID string, amountStr string) (*e
 	amount := number.NewInteger(0, AmountPrecision)
 
 	assetDecimal := number.FromString(amountStr)
-	if action.S == engine.PageSideBid {
+	if side == engine.PageSideBid {
 		maxFunds := number.NewDecimal(MaxFunds, int32(fundsPrecision))
 		if assetDecimal.Cmp(maxFunds) > 0 {
 			return nil, fmt.Errorf("amount too high")
@@ -166,7 +174,7 @@ func ParseOrderAction(action *OrderAction, assetID string, amountStr string) (*e
 
 	return &engine.Order{
 		Type:            orderType,
-		Side:            action.S,
+		Side:            side,
 		Quote:           quote,
 		Base:            base,
 		Price:           price,
@@ -177,19 +185,12 @@ func ParseOrderAction(action *OrderAction, assetID string, amountStr string) (*e
 	}, nil
 }
 
-func getQuoteBasePair(assetID string, a *OrderAction) (string, string) {
-	side := a.S
-	switch side {
-	case "A":
-		side = engine.PageSideAsk
-	case "B":
-		side = engine.PageSideBid
-	}
+func getQuoteBasePair(assetID, actionAssetID, side string) (string, string) {
 	var quote, base string
 	if side == engine.PageSideAsk {
-		quote, base = a.A.String(), assetID
+		quote, base = actionAssetID, assetID
 	} else if side == engine.PageSideBid {
-		quote, base = assetID, a.A.String()
+		quote, base = assetID, actionAssetID
 	} else {
 		return "", ""
 	}
