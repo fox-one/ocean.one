@@ -158,7 +158,7 @@ func ParseOrderAction(action *OrderAction, assetID string, amountStr string) (*e
 		if funds.Decimal().Cmp(QuoteMinimum(quote)) < 0 {
 			return nil, fmt.Errorf("amount to low")
 		}
-		if orderType == engine.OrderTypeLimit && !amount.Div(price).Decimal().Round(AmountPrecision).IsPositive() {
+		if orderType == engine.OrderTypeLimit && !funds.Div(price).Decimal().Round(AmountPrecision).IsPositive() {
 			return nil, fmt.Errorf("amount to low")
 		}
 	} else {
