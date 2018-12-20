@@ -36,7 +36,7 @@ type Broker struct {
 	EncryptionHeader []byte    `spanner:"encryption_header" gorm:"type:varchar(1024);"`
 	CreatedAt        time.Time `spanner:"created_at"`
 
-	DecryptedPIN string `spanner:"-"`
+	DecryptedPIN string `spanner:"-" sql:"-"`
 	Client       *mixin.Client
 }
 
