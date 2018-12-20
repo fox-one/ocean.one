@@ -27,42 +27,31 @@ import (
 const encryptionHeaderLength = 16
 
 type Broker struct {
-	BrokerId         string    `spanner:"broker_id"`
-	SessionId        string    `spanner:"session_id"`
-	SessionKey       string    `spanner:"session_key"`
-	PINToken         string    `spanner:"pin_token"`
-	EncryptedPIN     string    `spanner:"encrypted_pin"`
-	EncryptionHeader []byte    `spanner:"encryption_header"`
+	BrokerId         string    `spanner:"broker_id" gorm:"type:varchar(36);PRIMARY_KEY:"`
+	BrokerLabel      string    `gorm:"type:varchar(36);"`
+	SessionId        string    `spanner:"session_id" gorm:"type:varchar(36);"`
+	SessionKey       string    `spanner:"session_key" gorm:"type:varchar(1024);"`
+	PINToken         string    `spanner:"pin_token" gorm:"type:varchar(512);"`
+	EncryptedPIN     string    `spanner:"encrypted_pin" gorm:"type:varchar(512);"`
+	EncryptionHeader []byte    `spanner:"encryption_header" gorm:"type:varchar(1024);"`
 	CreatedAt        time.Time `spanner:"created_at"`
 
 	DecryptedPIN string `spanner:"-"`
 	Client       *mixin.Client
 }
 
-var dapp *Broker = nil
-
-func Dapp() (*Broker, error) {
-	if dapp != nil {
-		return dapp, nil
+func (p *Spanner) Dapp() (*Broker, error) {
+	if p.dapp == nil {
+		return nil, fmt.Errorf("dapp not set")
 	}
-
-	dapp := &Broker{
-		BrokerId:     config.ClientId,
-		SessionId:    config.SessionId,
-		SessionKey:   config.SessionKey,
-		PINToken:     config.PinToken,
-		DecryptedPIN: config.SessionAssetPIN,
-	}
-
-	err := dapp.LoadClient()
-	return dapp, err
+	return p.dapp, nil
 }
 
 func (p *Spanner) AllBrokers(ctx context.Context, decryptPIN bool) ([]*Broker, error) {
 	it := p.spanner.Single().Query(ctx, spanner.Statement{SQL: "SELECT * FROM brokers"})
 	defer it.Stop()
 
-	dapp, err := Dapp()
+	dapp, err := p.Dapp()
 	if err != nil {
 		return nil, err
 	}
@@ -98,16 +87,22 @@ func (p *Spanner) AllBrokers(ctx context.Context, decryptPIN bool) ([]*Broker, e
 	}
 }
 
-func (p *Spanner) AddBroker(ctx context.Context) (*Broker, error) {
-	dapp, err := Dapp()
+func (p *Spanner) AddBroker(ctx context.Context, brokerLabel string) (*Broker, error) {
+	dapp, err := p.Dapp()
+	if err != nil {
+		return nil, err
+	}
+	broker, err := dapp.AddBroker(ctx, brokerLabel)
 	if err != nil {
 		return nil, err
 	}
 
-	broker, err := dapp.AddBroker(ctx)
+	encryptedPIN, encryptionHeader, err := broker.EncryptPIN(ctx, broker.Client.Pin)
 	if err != nil {
 		return nil, err
 	}
+	broker.EncryptedPIN = encryptedPIN
+	broker.EncryptionHeader = encryptionHeader
 
 	insertBroker, err := spanner.InsertStruct("brokers", broker)
 	if err != nil {
@@ -117,7 +112,7 @@ func (p *Spanner) AddBroker(ctx context.Context) (*Broker, error) {
 	return broker, err
 }
 
-func (b *Broker) AddBroker(ctx context.Context) (*Broker, error) {
+func (b *Broker) AddBroker(ctx context.Context, brokerLabel string) (*Broker, error) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 1024)
 	if err != nil {
 		return nil, err
@@ -128,10 +123,15 @@ func (b *Broker) AddBroker(ctx context.Context) (*Broker, error) {
 	}
 	sessionSecret := base64.StdEncoding.EncodeToString(publicKeyBytes)
 
-	data, err := json.Marshal(map[string]string{
+	paras := map[string]string{
 		"session_secret": sessionSecret,
-		"full_name":      fmt.Sprintf("Ocean %x", md5.Sum(publicKeyBytes)),
-	})
+	}
+	if len(brokerLabel) > 0 {
+		paras["full_name"] = fmt.Sprintf("%s %x", brokerLabel, md5.Sum(publicKeyBytes))
+	} else {
+		paras["full_name"] = fmt.Sprintf("Ocean %x", md5.Sum(publicKeyBytes))
+	}
+	data, err := json.Marshal(paras)
 	if err != nil {
 		return nil, err
 	}
@@ -157,14 +157,18 @@ func (b *Broker) AddBroker(ctx context.Context) (*Broker, error) {
 	}
 
 	broker := &Broker{
-		BrokerId:  resp.Data.UserId,
-		SessionId: resp.Data.SessionId,
+		BrokerId:    resp.Data.UserId,
+		BrokerLabel: brokerLabel,
+		SessionId:   resp.Data.SessionId,
 		SessionKey: string(pem.EncodeToMemory(&pem.Block{
 			Type:  "RSA PRIVATE KEY",
 			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
 		})),
 		PINToken:  resp.Data.PinToken,
 		CreatedAt: time.Now(),
+	}
+	if err := broker.LoadClient(); err != nil {
+		return nil, err
 	}
 
 	err = broker.setupPIN(ctx)
@@ -281,12 +285,6 @@ func (b *Broker) setupPIN(ctx context.Context) error {
 	if resp.Error.Code > 0 {
 		return resp.Error
 	}
-	encryptedPIN, encryptionHeader, err := b.EncryptPIN(ctx, pin)
-	if err != nil {
-		return err
-	}
-	b.EncryptedPIN = encryptedPIN
-	b.EncryptionHeader = encryptionHeader
 	return nil
 }
 

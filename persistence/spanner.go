@@ -6,10 +6,12 @@ import (
 
 type Spanner struct {
 	spanner *spanner.Client
+	dapp    *Broker
 }
 
-func CreateSpanner(client *spanner.Client) Persist {
+func CreateSpanner(client *spanner.Client, dapp *Broker) Persist {
 	return &Spanner{
 		spanner: client,
+		dapp:    dapp,
 	}
 }

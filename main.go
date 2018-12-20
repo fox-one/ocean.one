@@ -28,12 +28,20 @@ func main() {
 		log.Panicln(err)
 	}
 
-	persist := persistence.CreateSpanner(spannerClient)
-
-	broker, err := persistence.Dapp()
-	if err != nil {
+	broker := &persistence.Broker{
+		BrokerId:     config.ClientId,
+		BrokerLabel:  "Ocean",
+		SessionId:    config.SessionId,
+		SessionKey:   config.SessionKey,
+		PINToken:     config.PinToken,
+		DecryptedPIN: config.SessionAssetPIN,
+	}
+	if err := broker.LoadClient(); err != nil {
 		log.Panicln(err)
 	}
+	broker.DecryptedPIN = config.SessionAssetPIN
+
+	persist := persistence.CreateSpanner(spannerClient, broker)
 
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:         config.RedisEngineCacheAddress,

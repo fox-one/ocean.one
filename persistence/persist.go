@@ -37,6 +37,7 @@ type Persist interface {
 	UserOrders(ctx context.Context, userId string, market, state string, offset time.Time, order string, limit int) ([]*Order, error)
 	OrderTrades(ctx context.Context, userId, orderId string) ([]*Trade, error)
 
+	Dapp() (*Broker, error)
 	AllBrokers(ctx context.Context, decryptPIN bool) ([]*Broker, error)
-	AddBroker(ctx context.Context) (*Broker, error)
+	AddBroker(ctx context.Context, brokerLabel string) (*Broker, error)
 }
