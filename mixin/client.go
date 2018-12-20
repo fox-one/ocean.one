@@ -14,7 +14,7 @@ type Client struct {
 	privateKey *rsa.PrivateKey
 }
 
-func CreateMixinClient(clientId, sessionId, pinToken, pin string, privateKey *rsa.PrivateKey) *Client {
+func CreateMixinClient(clientId, sessionId, pinToken, pin string, privateKey *rsa.PrivateKey) (*Client, error) {
 	client := &Client{
 		ClientId:   clientId,
 		SessionId:  sessionId,
@@ -22,6 +22,8 @@ func CreateMixinClient(clientId, sessionId, pinToken, pin string, privateKey *rs
 		privateKey: privateKey,
 	}
 
-	client.loadPinCipher(pinToken)
-	return client
+	if err := client.loadPinCipher(pinToken); err != nil {
+		return nil, err
+	}
+	return client, nil
 }

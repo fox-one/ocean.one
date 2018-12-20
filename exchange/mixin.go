@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	bot "github.com/MixinNetwork/bot-api-go-client"
 	"github.com/MixinNetwork/go-number"
 	"github.com/fox-one/ocean.one/engine"
+	"github.com/fox-one/ocean.one/persistence"
 	"github.com/satori/go.uuid"
 	"github.com/ugorji/go/codec"
 )
@@ -276,13 +276,13 @@ func (ex *Exchange) sendTransfer(ctx context.Context, brokerId, recipientId, ass
 	defer mutex.Unlock()
 
 	broker := ex.brokers[brokerId]
-	return bot.CreateTransfer(ctx, &bot.TransferInput{
+	return broker.CreateTransfer(ctx, &persistence.TransferInput{
 		AssetId:     assetId,
 		RecipientId: recipientId,
 		Amount:      amount,
 		TraceId:     traceId,
 		Memo:        memo,
-	}, broker.BrokerId, broker.SessionId, broker.SessionKey, broker.DecryptedPIN, broker.PINToken)
+	})
 }
 
 type tmap struct {

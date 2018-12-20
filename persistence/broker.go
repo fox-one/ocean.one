@@ -18,8 +18,9 @@ import (
 	"time"
 
 	"cloud.google.com/go/spanner"
-	"github.com/MixinNetwork/bot-api-go-client"
+	number "github.com/MixinNetwork/go-number"
 	"github.com/fox-one/ocean.one/config"
+	"github.com/fox-one/ocean.one/mixin"
 	"google.golang.org/api/iterator"
 )
 
@@ -35,20 +36,39 @@ type Broker struct {
 	CreatedAt        time.Time `spanner:"created_at"`
 
 	DecryptedPIN string `spanner:"-"`
+	Client       *mixin.Client
+}
+
+var dapp *Broker = nil
+
+func Dapp() (*Broker, error) {
+	if dapp != nil {
+		return dapp, nil
+	}
+
+	dapp := &Broker{
+		BrokerId:     config.ClientId,
+		SessionId:    config.SessionId,
+		SessionKey:   config.SessionKey,
+		PINToken:     config.PinToken,
+		DecryptedPIN: config.SessionAssetPIN,
+	}
+
+	err := dapp.LoadClient()
+	return dapp, err
 }
 
 func (p *Spanner) AllBrokers(ctx context.Context, decryptPIN bool) ([]*Broker, error) {
 	it := p.spanner.Single().Query(ctx, spanner.Statement{SQL: "SELECT * FROM brokers"})
 	defer it.Stop()
 
+	dapp, err := Dapp()
+	if err != nil {
+		return nil, err
+	}
+
 	brokers := []*Broker{
-		&Broker{
-			BrokerId:     config.ClientId,
-			SessionId:    config.SessionId,
-			SessionKey:   config.SessionKey,
-			PINToken:     config.PinToken,
-			DecryptedPIN: config.SessionAssetPIN,
-		},
+		dapp,
 	}
 
 	for {
@@ -64,7 +84,12 @@ func (p *Spanner) AllBrokers(ctx context.Context, decryptPIN bool) ([]*Broker, e
 			return brokers, err
 		}
 		if decryptPIN {
-			err = broker.decryptPIN()
+			err = broker.DecryptPIN()
+			if err != nil {
+				return brokers, err
+			}
+
+			err = broker.LoadClient()
 			if err != nil {
 				return brokers, err
 			}
@@ -74,6 +99,25 @@ func (p *Spanner) AllBrokers(ctx context.Context, decryptPIN bool) ([]*Broker, e
 }
 
 func (p *Spanner) AddBroker(ctx context.Context) (*Broker, error) {
+	dapp, err := Dapp()
+	if err != nil {
+		return nil, err
+	}
+
+	broker, err := dapp.AddBroker(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	insertBroker, err := spanner.InsertStruct("brokers", broker)
+	if err != nil {
+		return nil, err
+	}
+	_, err = p.spanner.Apply(ctx, []*spanner.Mutation{insertBroker})
+	return broker, err
+}
+
+func (b *Broker) AddBroker(ctx context.Context) (*Broker, error) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 1024)
 	if err != nil {
 		return nil, err
@@ -91,12 +135,8 @@ func (p *Spanner) AddBroker(ctx context.Context) (*Broker, error) {
 	if err != nil {
 		return nil, err
 	}
-	token, err := bot.SignAuthenticationToken(config.ClientId, config.SessionId, config.SessionKey, "POST", "/users", string(data))
-	if err != nil {
-		return nil, err
-	}
 
-	body, err := bot.Request(ctx, "POST", "/users", data, token)
+	body, err := b.Client.SendRequest(ctx, "POST", "/users", data)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +146,7 @@ func (p *Spanner) AddBroker(ctx context.Context) (*Broker, error) {
 			SessionId string `json:"session_id"`
 			PinToken  string `json:"pin_token"`
 		} `json:"data"`
-		Error bot.Error `json:"error"`
+		Error mixin.Error `json:"error"`
 	}
 	err = json.Unmarshal(body, &resp)
 	if err != nil {
@@ -131,15 +171,26 @@ func (p *Spanner) AddBroker(ctx context.Context) (*Broker, error) {
 	if err != nil {
 		return nil, err
 	}
-	insertBroker, err := spanner.InsertStruct("brokers", broker)
-	if err != nil {
-		return nil, err
-	}
-	_, err = p.spanner.Apply(ctx, []*spanner.Mutation{insertBroker})
 	return broker, err
 }
 
-func (b *Broker) decryptPIN() error {
+func (broker *Broker) LoadClient() error {
+	block, _ := pem.Decode([]byte(broker.SessionKey))
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return err
+	}
+
+	client, err := mixin.CreateMixinClient(broker.BrokerId, broker.SessionId, broker.PINToken, broker.DecryptedPIN, privateKey)
+	if err != nil {
+		return err
+	}
+
+	broker.Client = client
+	return nil
+}
+
+func (b *Broker) DecryptPIN() error {
 	privateBlock, _ := pem.Decode([]byte(config.AssetPrivateKey))
 	privateKey, err := x509.ParsePKCS1PrivateKey(privateBlock.Bytes)
 	if err != nil {
@@ -169,45 +220,7 @@ func (b *Broker) decryptPIN() error {
 	return nil
 }
 
-func (b *Broker) setupPIN(ctx context.Context) error {
-	pin, err := generateSixDigitCode(ctx)
-	if err != nil {
-		return err
-	}
-	encryptedPIN, err := bot.EncryptPIN(ctx, pin, b.PINToken, b.SessionId, b.SessionKey, uint64(time.Now().UnixNano()))
-	if err != nil {
-		return err
-	}
-	data, _ := json.Marshal(map[string]string{"pin": encryptedPIN})
-
-	token, err := bot.SignAuthenticationToken(b.BrokerId, b.SessionId, b.SessionKey, "POST", "/pin/update", string(data))
-	if err != nil {
-		return err
-	}
-	body, err := bot.Request(ctx, "POST", "/pin/update", data, token)
-	if err != nil {
-		return err
-	}
-	var resp struct {
-		Error bot.Error `json:"error"`
-	}
-	err = json.Unmarshal(body, &resp)
-	if err != nil {
-		return err
-	}
-	if resp.Error.Code > 0 {
-		return resp.Error
-	}
-	encryptedPIN, encryptionHeader, err := encryptPIN(ctx, pin)
-	if err != nil {
-		return err
-	}
-	b.EncryptedPIN = encryptedPIN
-	b.EncryptionHeader = encryptionHeader
-	return nil
-}
-
-func encryptPIN(ctx context.Context, pin string) (string, []byte, error) {
+func (b *Broker) EncryptPIN(ctx context.Context, pin string) (string, []byte, error) {
 	aesKey := make([]byte, 32)
 	_, err := rand.Read(aesKey)
 	if err != nil {
@@ -246,6 +259,37 @@ func encryptPIN(ctx context.Context, pin string) (string, []byte, error) {
 	return base64.StdEncoding.EncodeToString(cipherBytes), encryptionHeader, nil
 }
 
+func (b *Broker) setupPIN(ctx context.Context) error {
+	pin, err := generateSixDigitCode(ctx)
+	if err != nil {
+		return err
+	}
+	b.Client.Pin = pin
+	data, _ := json.Marshal(map[string]string{"pin": b.Client.EncryptPin()})
+
+	body, err := b.Client.SendRequest(ctx, "POST", "/pin/update", data)
+	if err != nil {
+		return err
+	}
+	var resp struct {
+		Error mixin.Error `json:"error"`
+	}
+	err = json.Unmarshal(body, &resp)
+	if err != nil {
+		return err
+	}
+	if resp.Error.Code > 0 {
+		return resp.Error
+	}
+	encryptedPIN, encryptionHeader, err := b.EncryptPIN(ctx, pin)
+	if err != nil {
+		return err
+	}
+	b.EncryptedPIN = encryptedPIN
+	b.EncryptionHeader = encryptionHeader
+	return nil
+}
+
 func generateSixDigitCode(ctx context.Context) (string, error) {
 	var b [8]byte
 	_, err := rand.Read(b[:])
@@ -257,4 +301,48 @@ func generateSixDigitCode(ctx context.Context) (string, error) {
 		c = 100000 + c
 	}
 	return fmt.Sprint(c), nil
+}
+
+type TransferInput struct {
+	AssetId     string
+	RecipientId string
+	Amount      number.Decimal
+	TraceId     string
+	Memo        string
+}
+
+func (broker *Broker) CreateTransfer(ctx context.Context, in *TransferInput) error {
+	if in.Amount.Exhausted() {
+		return nil
+	}
+
+	encryptedPIN := broker.Client.EncryptPin()
+	data, err := json.Marshal(map[string]interface{}{
+		"asset_id":    in.AssetId,
+		"opponent_id": in.RecipientId,
+		"amount":      in.Amount.Persist(),
+		"trace_id":    in.TraceId,
+		"memo":        in.Memo,
+		"pin":         encryptedPIN,
+	})
+	if err != nil {
+		return err
+	}
+
+	body, err := broker.Client.SendRequest(ctx, "POST", "/transfers", data)
+	if err != nil {
+		return err
+	}
+
+	var resp struct {
+		Error mixin.Error `json:"error"`
+	}
+	err = json.Unmarshal(body, &resp)
+	if err != nil {
+		return err
+	}
+	if resp.Error.Code > 0 {
+		return resp.Error
+	}
+	return nil
 }

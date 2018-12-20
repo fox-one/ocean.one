@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"log"
 	"time"
@@ -18,17 +19,39 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-func (client *Client) loadPinCipher(pinToken string) {
-	if token, err := base64.StdEncoding.DecodeString(pinToken); err == nil {
-		if keyBytes, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, client.privateKey, token, []byte(client.SessionId)); err == nil {
-			if block, err := aes.NewCipher(keyBytes); err == nil {
-				client.PinCipher = block
-				return
-			}
-		}
+type Error struct {
+	Status      int    `json:"status"`
+	Code        int    `json:"code"`
+	Description string `json:"description"`
+	trace       string
+}
+
+func (sessionError Error) Error() string {
+	str, err := json.Marshal(sessionError)
+	if err != nil {
+		log.Panicln(err)
+	}
+	return string(str)
+}
+
+func (client *Client) loadPinCipher(pinToken string) error {
+	token, err := base64.StdEncoding.DecodeString(pinToken)
+	if err != nil {
+		return err
 	}
 
-	log.Panicln("load pin cipher failed")
+	keyBytes, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, client.privateKey, token, []byte(client.SessionId))
+	if err != nil {
+		return err
+	}
+
+	block, err := aes.NewCipher(keyBytes)
+	if err != nil {
+		return err
+	}
+
+	client.PinCipher = block
+	return nil
 }
 
 func (client *Client) EncryptPin() string {

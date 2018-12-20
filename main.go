@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/x509"
-	"encoding/pem"
 	"flag"
 	"log"
 	"time"
@@ -12,7 +10,6 @@ import (
 	"github.com/fox-one/ocean.one/cache"
 	"github.com/fox-one/ocean.one/config"
 	"github.com/fox-one/ocean.one/exchange"
-	"github.com/fox-one/ocean.one/mixin"
 	"github.com/fox-one/ocean.one/persistence"
 	"github.com/go-redis/redis"
 )
@@ -33,13 +30,10 @@ func main() {
 
 	persist := persistence.CreateSpanner(spannerClient)
 
-	block, _ := pem.Decode([]byte(config.SessionKey))
-	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	broker, err := persistence.Dapp()
 	if err != nil {
 		log.Panicln(err)
 	}
-
-	mixinClient := mixin.CreateMixinClient(config.ClientId, config.SessionId, config.PinToken, config.SessionAssetPIN, privateKey)
 
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:         config.RedisEngineCacheAddress,
@@ -59,7 +53,7 @@ func main() {
 
 	switch *service {
 	case "engine":
-		exchange.NewExchange(persist, mixinClient).Run(ctx)
+		exchange.NewExchange(persist, broker.Client).Run(ctx)
 	case "http":
 		StartHTTP(ctx, persist)
 	}
