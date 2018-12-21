@@ -265,6 +265,7 @@ func (ex *Exchange) PollMixinNetwork(ctx context.Context) {
 		}
 		for _, s := range snapshots {
 			if ex.snapshots[s.SnapshotId] {
+				checkpoint = s.CreatedAt
 				continue
 			}
 			ex.ensureProcessSnapshot(ctx, s)
