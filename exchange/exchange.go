@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/MixinNetwork/go-number"
+	"github.com/Workiva/go-datastructures/queue"
 	"github.com/fox-one/ocean.one/engine"
 	"github.com/fox-one/ocean.one/mixin"
 	"github.com/fox-one/ocean.one/persistence"
@@ -26,6 +27,8 @@ type Exchange struct {
 
 	brokers map[string]*persistence.Broker
 	mutexes *tmap
+
+	transfers map[string]*queue.Queue
 
 	persist     persistence.Persist
 	mixinClient *mixin.Client
@@ -65,6 +68,7 @@ func NewExchange(persist persistence.Persist, mixinClient *mixin.Client) *Exchan
 		books:     make(map[string]*engine.Book),
 		snapshots: make(map[string]bool),
 		brokers:   make(map[string]*persistence.Broker),
+		transfers: make(map[string]*queue.Queue),
 		mutexes:   newTmap(),
 
 		persist:     persist,
@@ -79,8 +83,12 @@ func (ex *Exchange) Run(ctx context.Context) {
 	}
 	for _, b := range brokers {
 		ex.brokers[b.BrokerId] = b
-		go ex.PollTransfers(ctx, b.BrokerId)
+
+		q := queue.New(50)
+		ex.transfers[b.BrokerId] = q
+		go ex.DoTransfers(ctx, q)
 	}
+	go ex.PollTransfers(ctx)
 	go ex.PollMixinNetwork(ctx)
 	ex.PollOrderActions(ctx)
 }
@@ -113,15 +121,55 @@ func (ex *Exchange) PollOrderActions(ctx context.Context) {
 	}
 }
 
-func (ex *Exchange) PollTransfers(ctx context.Context, brokerId string) {
+func (ex *Exchange) PollTransfers(ctx context.Context) {
 	limit := 500
+	checkpoint := time.Time{}
 	for {
-		transfers, err := ex.persist.ListPendingTransfers(ctx, brokerId, limit)
+		transfers, err := ex.persist.ListPendingTransfers(ctx, "", checkpoint, limit)
 		if err != nil {
-			log.Println("ListPendingTransfers", brokerId, err)
+			log.Println("ListPendingTransfers", err)
 			time.Sleep(PollInterval)
 			continue
 		}
+
+		m := make(map[string][]interface{}, len(ex.brokers))
+		for _, t := range transfers {
+			arr, found := m[t.BrokerId]
+			if !found {
+				arr = make([]interface{}, 0, len(transfers))
+			}
+
+			arr = append(arr, t)
+			m[t.BrokerId] = arr
+			checkpoint = t.CreatedAt
+		}
+
+		for brokerId, arr := range m {
+			queue, found := ex.transfers[brokerId]
+			if found {
+				queue.Put(arr...)
+			}
+		}
+
+		if len(transfers) < limit {
+			time.Sleep(PollInterval)
+		}
+	}
+}
+
+func (ex *Exchange) DoTransfers(ctx context.Context, queue *queue.Queue) {
+	limit := 500
+	for {
+		arr, err := queue.Poll(50, time.Hour)
+		if err != nil {
+			time.Sleep(PollInterval)
+			continue
+		}
+		transfers := make([]*persistence.Transfer, 0, len(arr))
+		for _, t := range arr {
+			transfers = append(transfers, t.(*persistence.Transfer))
+		}
+
 		for _, t := range transfers {
 			ex.ensureProcessTransfer(ctx, t)
 		}

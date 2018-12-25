@@ -27,7 +27,7 @@ type Persist interface {
 	CancelOrder(ctx context.Context, order *engine.Order) error
 
 	CountPendingTransfers(ctx context.Context) (int64, error)
-	ListPendingTransfers(ctx context.Context, broker string, limit int) ([]*Transfer, error)
+	ListPendingTransfers(ctx context.Context, broker string, offset time.Time, limit int) ([]*Transfer, error)
 	ExpireTransfers(ctx context.Context, transfers []*Transfer) error
 	ReadTransferTrade(ctx context.Context, tradeId, assetId string) (*Trade, error)
 	CreateRefundTransfer(ctx context.Context, brokerId, userId, assetId string, amount number.Decimal, trace string) error

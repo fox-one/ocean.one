@@ -45,13 +45,16 @@ func (p *Spanner) CountPendingTransfers(ctx context.Context) (int64, error) {
 	return count, err
 }
 
-func (p *Spanner) ListPendingTransfers(ctx context.Context, broker string, limit int) ([]*Transfer, error) {
+func (p *Spanner) ListPendingTransfers(ctx context.Context, broker string, offset time.Time, limit int) ([]*Transfer, error) {
 	txn := p.spanner.ReadOnlyTransaction()
 	defer txn.Close()
 
 	it := txn.Query(ctx, spanner.Statement{
-		SQL:    fmt.Sprintf("SELECT transfer_id FROM transfers@{FORCE_INDEX=transfers_by_broker_created} WHERE broker_id=@broker ORDER BY broker_id,created_at LIMIT %d", limit),
-		Params: map[string]interface{}{"broker": broker},
+		SQL: fmt.Sprintf("SELECT transfer_id FROM transfers@{FORCE_INDEX=transfers_by_broker_created} WHERE broker_id=@broker AND created_at>@checkpoint ORDER BY broker_id,created_at LIMIT %d", limit),
+		Params: map[string]interface{}{
+			"broker":     broker,
+			"checkpoint": offset,
+		},
 	})
 	defer it.Stop()
 
