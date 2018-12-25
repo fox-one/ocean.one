@@ -2,9 +2,9 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/MixinNetwork/go-number"
@@ -26,6 +26,14 @@ type OrderEvent struct {
 	Action string
 }
 
+type Event struct {
+	Market    string                 `json:"market"`
+	Type      string                 `json:"event"`
+	Sequence  string                 `json:"sequence"`
+	Data      map[string]interface{} `json:"data,omitempty"`
+	Timestamp time.Time              `json:"timestamp"`
+}
+
 type Book struct {
 	market      string
 	events      chan *OrderEvent
@@ -35,11 +43,12 @@ type Book struct {
 	cancel      CancelCallback
 	asks        *Page
 	bids        *Page
-	queue       *cache.Queue
-	lock        *sync.RWMutex
+
+	sequence int64
 }
 
 func NewBook(ctx context.Context, market string, transact TransactCallback, cancel CancelCallback) *Book {
+	base, _ := time.Parse(time.RFC3339Nano, "2017-07-07T07:07:07.777777777Z")
 	return &Book{
 		market:      market,
 		events:      make(chan *OrderEvent, EventQueueSize),
@@ -49,8 +58,8 @@ func NewBook(ctx context.Context, market string, transact TransactCallback, canc
 		cancel:      cancel,
 		asks:        NewPage(PageSideAsk),
 		bids:        NewPage(PageSideBid),
-		queue:       cache.NewQueue(ctx, market),
-		lock:        &sync.RWMutex{},
+
+		sequence: time.Now().UnixNano() - base.UnixNano(),
 	}
 }
 
@@ -191,8 +200,6 @@ func (book *Book) cancelOrder(ctx context.Context, order *Order) {
 }
 
 func (book *Book) Run(ctx context.Context) {
-	go book.queue.Loop(ctx)
-
 	fullCacheTicker := time.NewTicker(time.Second * 30)
 	defer fullCacheTicker.Stop()
 
@@ -204,17 +211,13 @@ func (book *Book) Run(ctx context.Context) {
 	for {
 		select {
 		case event := <-book.events:
-			func() {
-				book.lock.Lock()
-				defer book.lock.Unlock()
-				if event.Action == OrderActionCreate {
-					book.createOrder(ctx, event.Order)
-				} else if event.Action == OrderActionCancel {
-					book.cancelOrder(ctx, event.Order)
-				} else {
-					log.Panicln(event)
-				}
-			}()
+			if event.Action == OrderActionCreate {
+				book.createOrder(ctx, event.Order)
+			} else if event.Action == OrderActionCancel {
+				book.cancelOrder(ctx, event.Order)
+			} else {
+				log.Panicln(event)
+			}
 		case <-fullCacheTicker.C:
 			book.cacheList(ctx, 0)
 		case <-bestCacheTicker.C:
@@ -223,23 +226,33 @@ func (book *Book) Run(ctx context.Context) {
 	}
 }
 
-func (book *Book) Orderbooks(limit int) ([]*Entry, []*Entry) {
-	book.lock.RLock()
-	defer book.lock.RUnlock()
+func (book *Book) attachEvent(ctx context.Context, typ string, data map[string]interface{}) {
+	book.sequence += 1
+	event := Event{
+		Market:    book.market,
+		Type:      typ,
+		Data:      data,
+		Timestamp: time.Now().UTC(),
+		Sequence:  fmt.Sprint(book.sequence),
+	}
 
-	return book.asks.List(limit, true), book.bids.List(limit, true)
+	for {
+		if data, err := json.Marshal(event); err == nil {
+			if _, err := cache.Redis(ctx).RPush("ORDER-EVENTS", data).Result(); err == nil {
+				break
+			}
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
 }
 
 func (book *Book) cacheList(ctx context.Context, limit int) {
-	book.lock.RLock()
-	defer book.lock.RUnlock()
-
 	event := fmt.Sprintf("BOOK-T%d", limit)
 	data := map[string]interface{}{
 		"asks": book.asks.List(limit, true),
 		"bids": book.bids.List(limit, true),
 	}
-	book.queue.AttachEvent(ctx, event, data)
+	book.attachEvent(ctx, event, data)
 }
 
 func (book *Book) cacheOrderEvent(ctx context.Context, event, side string, price, amount, funds number.Integer, tradeAndOrderIds ...string) {
@@ -264,5 +277,5 @@ func (book *Book) cacheOrderEvent(ctx context.Context, event, side string, price
 		data["taker_id"] = tradeAndOrderIds[2]
 	}
 
-	book.queue.AttachEvent(ctx, event, data)
+	book.attachEvent(ctx, event, data)
 }

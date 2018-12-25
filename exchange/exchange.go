@@ -93,15 +93,6 @@ func (ex *Exchange) Run(ctx context.Context) {
 	ex.PollOrderActions(ctx)
 }
 
-func (ex *Exchange) Orderbooks(baseAssetId, quoteAssetid string, limit int) ([]*engine.Entry, []*engine.Entry) {
-	market := baseAssetId + "-" + quoteAssetid
-	book := ex.books[market]
-	if book != nil {
-		return book.Orderbooks(limit)
-	}
-	return []*engine.Entry{}, []*engine.Entry{}
-}
-
 func (ex *Exchange) PollOrderActions(ctx context.Context) {
 	checkpoint, limit := time.Time{}, 500
 	for {
