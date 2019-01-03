@@ -40,6 +40,8 @@ func QuotePrecision(assetId string) uint8 {
 		return 8
 	case BitcoinAssetId:
 		return 8
+	case EthAssetId:
+		return 8
 	case USDTAssetId:
 		return 4
 	default:
@@ -53,6 +55,8 @@ func QuoteMinimum(assetId string) number.Decimal {
 	case MixinAssetId:
 		return number.FromString("0.0001")
 	case BitcoinAssetId:
+		return number.FromString("0.0001")
+	case EthAssetId:
 		return number.FromString("0.0001")
 	case USDTAssetId:
 		return number.FromString("1")

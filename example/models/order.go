@@ -15,6 +15,7 @@ import (
 const (
 	MixinAssetId   = "c94ac88f-4671-3976-b60a-09064f1811e8"
 	BitcoinAssetId = "c6d0c728-2624-429b-8e0d-d9d19b6592fa"
+	EthAssetId     = "43d61dcd-e413-450d-80b8-101d5e903357"
 	USDTAssetId    = "815b0b1a-2764-3736-8faa-42d694fa620a"
 )
 
@@ -129,16 +130,25 @@ func validateQuoteBase(quote, base string) bool {
 	if quote == base {
 		return false
 	}
-	if quote != BitcoinAssetId && quote != USDTAssetId && quote != MixinAssetId {
+	if quote != BitcoinAssetId && quote != USDTAssetId && quote != MixinAssetId && quote != EthAssetId {
 		return false
 	}
 	if quote == BitcoinAssetId && base == USDTAssetId {
+		return false
+	}
+	if quote == EthAssetId && base == USDTAssetId {
+		return false
+	}
+	if quote == EthAssetId && base == BitcoinAssetId {
 		return false
 	}
 	if quote == MixinAssetId && base == USDTAssetId {
 		return false
 	}
 	if quote == MixinAssetId && base == BitcoinAssetId {
+		return false
+	}
+	if quote == MixinAssetId && base == EthAssetId {
 		return false
 	}
 	return true

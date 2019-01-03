@@ -166,7 +166,6 @@ func fetchTrades(ctx context.Context, base, quote string, offset time.Time, limi
 	if err != nil {
 		return nil, session.ServerError(ctx, err)
 	}
-	req.Close = true
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, session.ServerError(ctx, err)

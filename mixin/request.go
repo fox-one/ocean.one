@@ -24,7 +24,6 @@ func (client *Client) SendRequest(ctx context.Context, method, uri string, paylo
 		return nil, err
 	}
 
-	req.Close = true
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	resp, err := httpClient.Do(req)
